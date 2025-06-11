@@ -1,0 +1,47 @@
+<?php
+/**
+ * Plugin Name: SlimWP Simple Points
+ * Plugin URI: https://yourwebsite.com/slimwp-simple-points
+ * Description: A lightweight dual-balance points system for WordPress with free and permanent points tracking.
+ * Version: 1.0.0
+ * Author: Your Name
+ * Author URI: https://yourwebsite.com
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: slimwp
+ * Domain Path: /languages
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Define plugin constants
+define('SLIMWP_VERSION', '1.0.0');
+define('SLIMWP_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('SLIMWP_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('SLIMWP_PLUGIN_FILE', __FILE__);
+
+// Include required files
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-database.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-hooks.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-shortcodes.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-ajax.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-user-profile.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-admin.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-settings.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-points.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/functions.php';
+
+// Initialize the plugin
+function slimwp_init() {
+    return SlimWP_Points::get_instance();
+}
+add_action('plugins_loaded', 'slimwp_init');
+
+// Activation hook
+register_activation_hook(__FILE__, array('SlimWP_Database', 'create_tables'));
+
+// Load text domain
+function slimwp_load_textdomain() {

@@ -48,8 +48,15 @@ class SlimWP_WooCommerce {
         add_action('woocommerce_product_data_panels', array($this, 'add_product_data_panel'));
         add_action('woocommerce_process_product_meta', array($this, 'save_product_data'));
         
-        // Order completion hook
-        add_action('woocommerce_order_status_completed', array($this, 'award_points_on_order_completion'));
+        // Order status hooks - configurable
+        $settings = get_option('slimwp_woocommerce_settings', array());
+        $award_on_status = isset($settings['award_on_status']) ? $settings['award_on_status'] : 'completed';
+        
+        if ($award_on_status === 'processing') {
+            add_action('woocommerce_order_status_processing', array($this, 'award_points_on_order_completion'));
+        } else {
+            add_action('woocommerce_order_status_completed', array($this, 'award_points_on_order_completion'));
+        }
         
         // Admin notices
         add_action('admin_notices', array($this, 'admin_notices'));
@@ -70,12 +77,12 @@ class SlimWP_WooCommerce {
             return $tabs;
         }
         
-        // Only show for digital products (virtual + downloadable)
-        if ($product->is_virtual() && $product->is_downloadable()) {
+        // Only show for digital products (virtual)
+        if ($product->is_virtual()) {
             $tabs['slimwp_points'] = array(
                 'label'    => __('SlimWP Points', 'SlimWp-Simple-Points'),
                 'target'   => 'slimwp_points_product_data',
-                'class'    => array('show_if_virtual', 'show_if_downloadable'),
+                'class'    => array('show_if_virtual'),
                 'priority' => 25,
             );
         }
@@ -144,7 +151,7 @@ class SlimWP_WooCommerce {
                             <strong><?php _e('ℹ️ Points Information:', 'SlimWp-Simple-Points'); ?></strong><br>
                             • <?php _e('Points will be added to the customer\'s <strong>permanent balance</strong>', 'SlimWp-Simple-Points'); ?><br>
                             • <?php _e('Points are awarded when the order status changes to <strong>completed</strong>', 'SlimWp-Simple-Points'); ?><br>
-                            • <?php _e('Only works for digital products (virtual + downloadable)', 'SlimWp-Simple-Points'); ?>
+                            • <?php _e('Only works for digital products (virtual)', 'SlimWp-Simple-Points'); ?>
                         </div>
                     </div>
                 </div>
@@ -215,8 +222,8 @@ class SlimWP_WooCommerce {
                 continue;
             }
             
-            // Check if product is digital (virtual + downloadable)
-            if (!($product->is_virtual() && $product->is_downloadable())) {
+            // Check if product is digital (virtual)
+            if (!$product->is_virtual()) {
                 continue;
             }
             

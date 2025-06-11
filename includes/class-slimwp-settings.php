@@ -27,7 +27,7 @@ class SlimWP_Settings {
     }
     
     public function settings_page() {
-         if (isset($_POST['submit']) && check_admin_referer('slimwp_settings')) {
+        if (isset($_POST['submit']) && check_admin_referer('slimwp_settings')) {
             $hooks = array(
                 'register' => isset($_POST['hooks']['register']),
                 'register_points' => intval($_POST['register_points']),
@@ -46,10 +46,31 @@ class SlimWP_Settings {
             $woocommerce_settings = array(
                 'enabled' => isset($_POST['woocommerce']['enabled']),
                 'default_points' => intval($_POST['woocommerce_default_points']),
+                'award_on_status' => sanitize_text_field($_POST['woocommerce_award_on_status']),
                 'show_on_checkout' => isset($_POST['woocommerce']['show_on_checkout']),
                 'email_notification' => isset($_POST['woocommerce']['email_notification'])
             );
             update_option('slimwp_woocommerce_settings', $woocommerce_settings);
+            
+            // Save Stripe settings
+            $stripe_settings = array(
+                'enabled' => isset($_POST['stripe']['enabled']),
+                'mode' => sanitize_text_field($_POST['stripe_mode']),
+                'test_publishable_key' => sanitize_text_field($_POST['stripe_test_publishable_key']),
+                'test_secret_key' => sanitize_text_field($_POST['stripe_test_secret_key']),
+                'test_webhook_secret' => sanitize_text_field($_POST['stripe_test_webhook_secret']),
+                'live_publishable_key' => sanitize_text_field($_POST['stripe_live_publishable_key']),
+                'live_secret_key' => sanitize_text_field($_POST['stripe_live_secret_key']),
+                'live_webhook_secret' => sanitize_text_field($_POST['stripe_live_webhook_secret']),
+                'currency' => sanitize_text_field($_POST['stripe_currency']),
+                'email_template' => sanitize_textarea_field($_POST['stripe_email_template'])
+            );
+            update_option('slimwp_stripe_settings', $stripe_settings);
+            
+            // Handle package management
+            if (isset($_POST['stripe_packages'])) {
+                $this->handle_package_management();
+            }
             
             echo '<div class="notice notice-success is-dismissible" style="margin: 20px 20px 0;"><p>✅ Settings saved successfully!</p></div>';
         }
@@ -71,8 +92,23 @@ class SlimWP_Settings {
         $woocommerce_settings = get_option('slimwp_woocommerce_settings', array(
             'enabled' => false,
             'default_points' => 50,
+            'award_on_status' => 'completed',
             'show_on_checkout' => true,
             'email_notification' => true
+        ));
+        
+        // Get Stripe settings
+        $stripe_settings = get_option('slimwp_stripe_settings', array(
+            'enabled' => false,
+            'mode' => 'test',
+            'test_publishable_key' => '',
+            'test_secret_key' => '',
+            'test_webhook_secret' => '',
+            'live_publishable_key' => '',
+            'live_secret_key' => '',
+            'live_webhook_secret' => '',
+            'currency' => 'USD',
+            'email_template' => "Hello {user_name},\n\nThank you for your purchase!\n\nYou have successfully purchased {points} points for {amount} {currency}.\n\nThe points have been added to your permanent balance and are ready to use.\n\nBest regards,\n{site_name}\n{site_url}"
         ));
         ?>
         <style>
@@ -294,6 +330,27 @@ class SlimWP_Settings {
                             
                             <div class="settings-row">
                                 <div class="settings-label">
+                                    <h3>Award Points When</h3>
+                                    <p>Choose when to award points during the order process</p>
+                                </div>
+                                <div class="settings-control">
+                                    <div class="points-input">
+                                        <span>Award points when order status becomes:</span>
+                                        <select name="woocommerce_award_on_status">
+                                            <option value="processing" <?php selected(isset($woocommerce_settings['award_on_status']) ? $woocommerce_settings['award_on_status'] : 'completed', 'processing'); ?>>Processing (Immediate)</option>
+                                            <option value="completed" <?php selected(isset($woocommerce_settings['award_on_status']) ? $woocommerce_settings['award_on_status'] : 'completed', 'completed'); ?>>Completed (Manual)</option>
+                                        </select>
+                                    </div>
+                                    <div class="info-box">
+                                        <strong>📋 Order Status Guide:</strong><br>
+                                        • <strong>Processing:</strong> Points awarded immediately after purchase (automatic)<br>
+                                        • <strong>Completed:</strong> Points awarded when you manually complete the order (manual control)
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
                                     <h3>Show Points on Checkout</h3>
                                     <p>Display points information on checkout and order confirmation pages</p>
                                 </div>
@@ -322,6 +379,165 @@ class SlimWP_Settings {
                                 <?php submit_button('Save Settings', 'primary', 'submit', false); ?>
                             </div>
                         </div>
+                        
+                        <div class="settings-card">
+                            <h2>💳 Stripe Integration</h2>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Enable Stripe Integration</h3>
+                                    <p>Allow users to purchase points directly with Stripe checkout</p>
+                                </div>
+                                <div class="settings-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" name="stripe[enabled]" value="1" <?php checked($stripe_settings['enabled']); ?>>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="info-box">
+                                        <strong>ℹ️ How it works:</strong><br>
+                                        • Users purchase points packages via secure Stripe checkout<br>
+                                        • Points are automatically added to <strong>permanent balance</strong><br>
+                                        • Use shortcode <code>[slimwp_stripe_packages]</code> to display packages<br>
+                                        • Webhook verification ensures secure transactions
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Mode</h3>
+                                    <p>Choose between test mode (for development) or live mode (for production)</p>
+                                </div>
+                                <div class="settings-control">
+                                    <div class="points-input">
+                                        <label style="margin-right: 20px;">
+                                            <input type="radio" name="stripe_mode" value="test" <?php checked($stripe_settings['mode'], 'test'); ?>>
+                                            Test Mode
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="stripe_mode" value="live" <?php checked($stripe_settings['mode'], 'live'); ?>>
+                                            Live Mode
+                                        </label>
+                                    </div>
+                                    <div class="warning-box">
+                                        <strong>⚠️ Important:</strong> Always test thoroughly in test mode before switching to live mode.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Test API Keys</h3>
+                                    <p>API keys for test mode (start with pk_test_ and sk_test_)</p>
+                                </div>
+                                <div class="settings-control">
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Publishable Key:</label>
+                                        <input type="text" name="stripe_test_publishable_key" value="<?php echo esc_attr($stripe_settings['test_publishable_key']); ?>" 
+                                               placeholder="pk_test_..." style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                    </div>
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Secret Key:</label>
+                                        <input type="password" name="stripe_test_secret_key" value="<?php echo esc_attr($stripe_settings['test_secret_key']); ?>" 
+                                               placeholder="sk_test_..." style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Webhook Secret:</label>
+                                        <input type="password" name="stripe_test_webhook_secret" value="<?php echo esc_attr($stripe_settings['test_webhook_secret']); ?>" 
+                                               placeholder="whsec_..." style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Live API Keys</h3>
+                                    <p>API keys for live mode (start with pk_live_ and sk_live_)</p>
+                                </div>
+                                <div class="settings-control">
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Publishable Key:</label>
+                                        <input type="text" name="stripe_live_publishable_key" value="<?php echo esc_attr($stripe_settings['live_publishable_key']); ?>" 
+                                               placeholder="pk_live_..." style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                    </div>
+                                    <div style="margin-bottom: 12px;">
+                                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Secret Key:</label>
+                                        <input type="password" name="stripe_live_secret_key" value="<?php echo esc_attr($stripe_settings['live_secret_key']); ?>" 
+                                               placeholder="sk_live_..." style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Webhook Secret:</label>
+                                        <input type="password" name="stripe_live_webhook_secret" value="<?php echo esc_attr($stripe_settings['live_webhook_secret']); ?>" 
+                                               placeholder="whsec_..." style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Currency</h3>
+                                    <p>Currency for all point packages</p>
+                                </div>
+                                <div class="settings-control">
+                                    <select name="stripe_currency" style="padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                                        <option value="USD" <?php selected($stripe_settings['currency'], 'USD'); ?>>USD - US Dollar</option>
+                                        <option value="EUR" <?php selected($stripe_settings['currency'], 'EUR'); ?>>EUR - Euro</option>
+                                        <option value="GBP" <?php selected($stripe_settings['currency'], 'GBP'); ?>>GBP - British Pound</option>
+                                        <option value="CAD" <?php selected($stripe_settings['currency'], 'CAD'); ?>>CAD - Canadian Dollar</option>
+                                        <option value="AUD" <?php selected($stripe_settings['currency'], 'AUD'); ?>>AUD - Australian Dollar</option>
+                                        <option value="JPY" <?php selected($stripe_settings['currency'], 'JPY'); ?>>JPY - Japanese Yen</option>
+                                        <option value="CHF" <?php selected($stripe_settings['currency'], 'CHF'); ?>>CHF - Swiss Franc</option>
+                                        <option value="SEK" <?php selected($stripe_settings['currency'], 'SEK'); ?>>SEK - Swedish Krona</option>
+                                        <option value="NOK" <?php selected($stripe_settings['currency'], 'NOK'); ?>>NOK - Norwegian Krone</option>
+                                        <option value="DKK" <?php selected($stripe_settings['currency'], 'DKK'); ?>>DKK - Danish Krone</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Email Template</h3>
+                                    <p>Email sent to users after successful purchase</p>
+                                </div>
+                                <div class="settings-control">
+                                    <textarea name="stripe_email_template" rows="8" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px; font-family: monospace; font-size: 13px;"><?php echo esc_textarea($stripe_settings['email_template']); ?></textarea>
+                                    <div class="info-box">
+                                        <strong>📧 Available placeholders:</strong><br>
+                                        <code>{user_name}</code> - Customer's display name<br>
+                                        <code>{points}</code> - Points purchased<br>
+                                        <code>{amount}</code> - Amount paid<br>
+                                        <code>{currency}</code> - Currency code<br>
+                                        <code>{site_name}</code> - Your site name<br>
+                                        <code>{site_url}</code> - Your site URL
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Webhook URL</h3>
+                                    <p>Add this URL to your Stripe webhook endpoints</p>
+                                </div>
+                                <div class="settings-control">
+                                    <input type="text" value="<?php echo admin_url('admin-ajax.php?action=slimwp_stripe_webhook'); ?>" readonly 
+                                           style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px; background: #f6f7f7;">
+                                    <div class="info-box">
+                                        <strong>🔗 Setup Instructions:</strong><br>
+                                        1. Go to your Stripe Dashboard → Webhooks<br>
+                                        2. Click "Add endpoint"<br>
+                                        3. Paste the URL above<br>
+                                        4. Select events: <code>checkout.session.completed</code> and <code>checkout.session.expired</code><br>
+                                        5. Copy the webhook secret and paste it in the API keys section above
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="submit-wrap">
+                                <?php submit_button('Save Settings', 'primary', 'submit', false); ?>
+                            </div>
+                        </div>
+                        
+                        <?php $this->render_packages_management($stripe_settings); ?>
                     </form>
                     
                     <div class="settings-card">
@@ -447,6 +663,210 @@ add_action('slimwp_points_balance_updated', function($user_id, $amount, $new_tot
                     </div>
                 </div>
             </div>
+        </div>
+        <?php
+    }
+    
+    private function handle_package_management() {
+        if (isset($_POST['add_package'])) {
+            $package_data = array(
+                'name' => sanitize_text_field($_POST['package_name']),
+                'description' => sanitize_textarea_field($_POST['package_description']),
+                'points' => intval($_POST['package_points']),
+                'price' => floatval($_POST['package_price']),
+                'currency' => sanitize_text_field($_POST['stripe_currency']),
+                'status' => 'active'
+            );
+            
+            if (!empty($package_data['name']) && $package_data['points'] > 0 && $package_data['price'] > 0) {
+                SlimWP_Stripe_Database::create_package($package_data);
+            }
+        }
+        
+        if (isset($_POST['edit_package'])) {
+            $package_id = intval($_POST['package_id']);
+            $package_data = array(
+                'name' => sanitize_text_field($_POST['package_name']),
+                'description' => sanitize_textarea_field($_POST['package_description']),
+                'points' => intval($_POST['package_points']),
+                'price' => floatval($_POST['package_price']),
+                'currency' => sanitize_text_field($_POST['stripe_currency']),
+                'status' => sanitize_text_field($_POST['package_status'])
+            );
+            
+            if ($package_id > 0 && !empty($package_data['name']) && $package_data['points'] > 0 && $package_data['price'] > 0) {
+                SlimWP_Stripe_Database::update_package($package_id, $package_data);
+            }
+        }
+        
+        if (isset($_POST['delete_package'])) {
+            $package_id = intval($_POST['package_id']);
+            if ($package_id > 0) {
+                SlimWP_Stripe_Database::delete_package($package_id);
+            }
+        }
+    }
+    
+    private function render_packages_management($stripe_settings) {
+        $packages = SlimWP_Stripe_Database::get_packages('all');
+        ?>
+        <div class="settings-card">
+            <h2>📦 Points Packages</h2>
+            
+            <div class="info-box">
+                <strong>💡 Tip:</strong> Create different packages to give users options. Popular combinations: Starter (1000 points), Popular (2500 points), Premium (5000 points).
+            </div>
+            
+            <!-- Add New Package Form -->
+            <div style="background: #f6f7f7; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <h3 style="margin: 0 0 16px; font-size: 16px;">Add New Package</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Package Name:</label>
+                        <input type="text" name="package_name" placeholder="e.g., Starter Pack" required
+                               style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Points:</label>
+                        <input type="number" name="package_points" placeholder="1000" min="1" required
+                               style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Price (<?php echo $stripe_settings['currency']; ?>):</label>
+                        <input type="number" name="package_price" placeholder="9.99" min="0.01" step="0.01" required
+                               style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                    </div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description (optional):</label>
+                    <input type="text" name="package_description" placeholder="Perfect for getting started"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                </div>
+                <button type="submit" name="add_package" class="button-primary">Add Package</button>
+            </div>
+            
+            <!-- Existing Packages -->
+            <?php if (!empty($packages)): ?>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                        <thead>
+                            <tr style="background: #f6f7f7;">
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e1e1e1;">Package</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e1e1e1;">Points</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e1e1e1;">Price</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e1e1e1;">Status</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid #e1e1e1;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($packages as $package): ?>
+                                <tr style="border-bottom: 1px solid #f0f0f1;">
+                                    <td style="padding: 12px;">
+                                        <strong><?php echo esc_html($package->name); ?></strong>
+                                        <?php if (!empty($package->description)): ?>
+                                            <br><small style="color: #50575e;"><?php echo esc_html($package->description); ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="padding: 12px;"><?php echo number_format($package->points); ?></td>
+                                    <td style="padding: 12px;"><?php echo $package->currency . ' ' . number_format($package->price, 2); ?></td>
+                                    <td style="padding: 12px;">
+                                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; <?php echo $package->status === 'active' ? 'background: #d1e7dd; color: #0f5132;' : 'background: #f8d7da; color: #842029;'; ?>">
+                                            <?php echo ucfirst($package->status); ?>
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px;">
+                                        <button type="button" onclick="editPackage(<?php echo $package->id; ?>, '<?php echo esc_js($package->name); ?>', '<?php echo esc_js($package->description); ?>', <?php echo $package->points; ?>, <?php echo $package->price; ?>, '<?php echo $package->status; ?>')" 
+                                                style="margin-right: 8px; padding: 4px 8px; background: #2271b1; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                            Edit
+                                        </button>
+                                        <button type="submit" name="delete_package" value="<?php echo $package->id; ?>" 
+                                                onclick="return confirm('Are you sure you want to delete this package?')"
+                                                style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                            Delete
+                                        </button>
+                                        <input type="hidden" name="package_id" value="<?php echo $package->id; ?>">
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="info-box">
+                    <strong>📦 No packages yet:</strong> Add your first points package above to get started.
+                </div>
+            <?php endif; ?>
+            
+            <!-- Edit Package Modal (Hidden by default) -->
+            <div id="edit-package-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px; border-radius: 8px; width: 90%; max-width: 500px;">
+                    <h3 style="margin: 0 0 16px;">Edit Package</h3>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Package Name:</label>
+                        <input type="text" id="edit-package-name" name="package_name" required
+                               style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description:</label>
+                        <input type="text" id="edit-package-description" name="package_description"
+                               style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Points:</label>
+                            <input type="number" id="edit-package-points" name="package_points" min="1" required
+                                   style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Price:</label>
+                            <input type="number" id="edit-package-price" name="package_price" min="0.01" step="0.01" required
+                                   style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Status:</label>
+                        <select id="edit-package-status" name="package_status"
+                                style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div style="text-align: right;">
+                        <button type="button" onclick="closeEditModal()" 
+                                style="margin-right: 8px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cancel
+                        </button>
+                        <button type="submit" name="edit_package" 
+                                style="padding: 8px 16px; background: #2271b1; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Save Changes
+                        </button>
+                    </div>
+                    <input type="hidden" id="edit-package-id" name="package_id">
+                </div>
+            </div>
+            
+            <script>
+                function editPackage(id, name, description, points, price, status) {
+                    document.getElementById('edit-package-id').value = id;
+                    document.getElementById('edit-package-name').value = name;
+                    document.getElementById('edit-package-description').value = description;
+                    document.getElementById('edit-package-points').value = points;
+                    document.getElementById('edit-package-price').value = price;
+                    document.getElementById('edit-package-status').value = status;
+                    document.getElementById('edit-package-modal').style.display = 'block';
+                }
+                
+                function closeEditModal() {
+                    document.getElementById('edit-package-modal').style.display = 'none';
+                }
+                
+                // Close modal when clicking outside
+                document.getElementById('edit-package-modal').addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeEditModal();
+                    }
+                });
+            </script>
         </div>
         <?php
     }

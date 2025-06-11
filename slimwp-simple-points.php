@@ -8,7 +8,7 @@
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: slimwp
+ * Text Domain: SlimWp-Simple-Points
  * Domain Path: /languages
  */
 
@@ -32,6 +32,7 @@ require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-user-profile.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-admin.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-settings.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-points.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-woocommerce.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/functions.php';
 
 // Initialize the plugin
@@ -42,6 +43,3 @@ add_action('plugins_loaded', 'slimwp_init');
 
 // Activation hook
 register_activation_hook(__FILE__, array('SlimWP_Database', 'create_tables'));
-
-// Load text domain
-function slimwp_load_textdomain() {

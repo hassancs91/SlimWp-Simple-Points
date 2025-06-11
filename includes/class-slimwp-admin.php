@@ -18,8 +18,8 @@ class SlimWP_Admin {
     
     public function add_admin_menu() {
         add_menu_page(
-            __('SlimWP Points System', 'slimwp'),
-            __('SlimWP Points', 'slimwp'),
+            __('SlimWP Points System', 'SlimWp-Simple-Points'),
+            __('SlimWP Points', 'SlimWp-Simple-Points'),
             'manage_options',
             'slimwp-points',
             array($this, 'admin_page'),
@@ -29,8 +29,8 @@ class SlimWP_Admin {
         
         add_submenu_page(
             'slimwp-points',
-            __('Transactions', 'slimwp'),
-            __('Transactions', 'slimwp'),
+            __('Transactions', 'SlimWp-Simple-Points'),
+            __('Transactions', 'SlimWp-Simple-Points'),
             'manage_options',
             'slimwp-points',
             array($this, 'admin_page')

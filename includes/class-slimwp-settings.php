@@ -18,8 +18,8 @@ class SlimWP_Settings {
     public function add_settings_menu() {
         add_submenu_page(
             'slimwp-points',
-            __('Settings', 'slimwp'),
-            __('Settings', 'slimwp'),
+            __('Settings', 'SlimWp-Simple-Points'),
+            __('Settings', 'SlimWp-Simple-Points'),
             'manage_options',
             'slimwp-points-settings',
             array($this, 'settings_page')
@@ -41,6 +41,16 @@ class SlimWP_Settings {
                 'monthly_reset_points' => intval($_POST['monthly_reset_points'])
             );
             update_option($this->hooks_option, $hooks);
+            
+            // Save WooCommerce settings
+            $woocommerce_settings = array(
+                'enabled' => isset($_POST['woocommerce']['enabled']),
+                'default_points' => intval($_POST['woocommerce_default_points']),
+                'show_on_checkout' => isset($_POST['woocommerce']['show_on_checkout']),
+                'email_notification' => isset($_POST['woocommerce']['email_notification'])
+            );
+            update_option('slimwp_woocommerce_settings', $woocommerce_settings);
+            
             echo '<div class="notice notice-success is-dismissible" style="margin: 20px 20px 0;"><p>✅ Settings saved successfully!</p></div>';
         }
         
@@ -55,6 +65,14 @@ class SlimWP_Settings {
             'daily_reset_points' => 100,
             'monthly_reset' => false,
             'monthly_reset_points' => 1000
+        ));
+        
+        // Get WooCommerce settings
+        $woocommerce_settings = get_option('slimwp_woocommerce_settings', array(
+            'enabled' => false,
+            'default_points' => 50,
+            'show_on_checkout' => true,
+            'email_notification' => true
         ));
         ?>
         <style>
@@ -224,6 +242,79 @@ class SlimWP_Settings {
                                     <div class="warning-box">
                                         <strong>⚠️ Warning:</strong> This will REPLACE the user's free balance, not add to it. Permanent balance remains untouched.
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <div class="submit-wrap">
+                                <?php submit_button('Save Settings', 'primary', 'submit', false); ?>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-card">
+                            <h2>🛒 WooCommerce Integration</h2>
+                            
+                            <?php if (!class_exists('WooCommerce')): ?>
+                                <div class="warning-box">
+                                    <strong>⚠️ WooCommerce Not Found:</strong> WooCommerce plugin is required for this integration to work. Please install and activate WooCommerce first.
+                                </div>
+                            <?php endif; ?>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Enable WooCommerce Integration</h3>
+                                    <p>Allow customers to earn points when purchasing digital products</p>
+                                </div>
+                                <div class="settings-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" name="woocommerce[enabled]" value="1" <?php checked($woocommerce_settings['enabled']); ?>>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <div class="info-box">
+                                        <strong>ℹ️ How it works:</strong><br>
+                                        • Add a "SlimWP Points" tab to digital product edit pages<br>
+                                        • Set points amount per product<br>
+                                        • Points awarded when order status = "completed"<br>
+                                        • Points go to customer's <strong>permanent balance</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Default Points Amount</h3>
+                                    <p>Default points value when enabling points for new digital products</p>
+                                </div>
+                                <div class="settings-control">
+                                    <div class="points-input">
+                                        <input type="number" name="woocommerce_default_points" value="<?php echo $woocommerce_settings['default_points']; ?>" min="0">
+                                        <span>points per digital product</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Show Points on Checkout</h3>
+                                    <p>Display points information on checkout and order confirmation pages</p>
+                                </div>
+                                <div class="settings-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" name="woocommerce[show_on_checkout]" value="1" <?php checked($woocommerce_settings['show_on_checkout']); ?>>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="settings-row">
+                                <div class="settings-label">
+                                    <h3>Email Notifications</h3>
+                                    <p>Send email notifications when points are awarded for purchases</p>
+                                </div>
+                                <div class="settings-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" name="woocommerce[email_notification]" value="1" <?php checked($woocommerce_settings['email_notification']); ?>>
+                                        <span class="toggle-slider"></span>
+                                    </label>
                                 </div>
                             </div>
                             

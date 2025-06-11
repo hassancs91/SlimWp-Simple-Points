@@ -18,6 +18,7 @@ class SlimWP_Points {
     private $user_profile;
     private $admin;
     private $settings;
+    private $woocommerce;
     
     public static function get_instance() {
         if (null === self::$instance) {
@@ -41,6 +42,9 @@ class SlimWP_Points {
             $this->admin = new SlimWP_Admin($this);
             $this->settings = new SlimWP_Settings($this);
         }
+        
+        // Initialize WooCommerce integration
+        $this->woocommerce = new SlimWP_WooCommerce($this);
         
         // Initialize everything
         add_action('init', array($this, 'init'));

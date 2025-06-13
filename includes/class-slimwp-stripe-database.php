@@ -62,8 +62,14 @@ class SlimWP_Stripe_Database {
         
         $packages_table = $wpdb->prefix . 'slimwp_stripe_packages';
         
-        // Check if any packages exist
-        $existing_count = $wpdb->get_var("SELECT COUNT(*) FROM {$packages_table}");
+        // Validate table name for security
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', str_replace($wpdb->prefix, '', $packages_table))) {
+            error_log('SlimWP Security: Invalid table name in create_default_packages: ' . $packages_table);
+            return false;
+        }
+        
+        // Check if any packages exist using prepared statement
+        $existing_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM `%s`", $packages_table));
         
         if ($existing_count == 0) {
             // Create some default packages

@@ -409,17 +409,71 @@ class SlimWP_Admin {
     }
     
     public function handle_bulk_update() {
+        // Additional security check
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized access attempt logged.', 'Security Error', array('response' => 403));
+        }
+        
         $user_ids = sanitize_text_field($_POST['user_ids']);
         $operation = sanitize_text_field($_POST['operation']);
         $amount = floatval($_POST['amount']);
         $description = sanitize_text_field($_POST['description']);
         $balance_type = isset($_POST['balance_type']) ? sanitize_text_field($_POST['balance_type']) : 'free';
         
-        if ($user_ids === 'all') {
-            $users = get_users(array('fields' => 'ID'));
-        } else {
-            $users = array_map('intval', explode(',', $user_ids));
+        // Validate operation type
+        $allowed_operations = array('add', 'subtract', 'set');
+        if (!in_array($operation, $allowed_operations)) {
+            error_log('SlimWP Security: Invalid operation attempted: ' . $operation);
+            wp_die('Invalid operation.', 'Security Error', array('response' => 400));
         }
+        
+        // Validate balance type
+        $allowed_balance_types = array('free', 'permanent');
+        if (!in_array($balance_type, $allowed_balance_types)) {
+            error_log('SlimWP Security: Invalid balance type attempted: ' . $balance_type);
+            wp_die('Invalid balance type.', 'Security Error', array('response' => 400));
+        }
+        
+        // Validate amount
+        if ($amount < 0 || $amount > 999999999) {
+            error_log('SlimWP Security: Invalid amount attempted: ' . $amount);
+            wp_die('Invalid amount. Must be between 0 and 999,999,999.', 'Security Error', array('response' => 400));
+        }
+        
+        // Validate description
+        if (empty($description) || strlen($description) > 255) {
+            wp_die('Description is required and must be less than 255 characters.', 'Validation Error', array('response' => 400));
+        }
+        
+        if ($user_ids === 'all') {
+            // Additional confirmation for 'all' users operation
+            $total_users = count_users();
+            if ($total_users['total_users'] > 1000) {
+                error_log('SlimWP Security: Bulk operation attempted on ' . $total_users['total_users'] . ' users');
+                wp_die('Bulk operation on more than 1000 users requires manual confirmation. Please contact administrator.', 'Security Limit', array('response' => 400));
+            }
+            $users = get_users(array('fields' => 'ID', 'number' => 1000)); // Limit to 1000 users max
+        } else {
+            // Validate and sanitize user IDs
+            $user_id_array = array_map('trim', explode(',', $user_ids));
+            $users = array();
+            
+            foreach ($user_id_array as $user_id) {
+                $user_id = intval($user_id);
+                if ($user_id > 0 && user_can($user_id, 'read')) { // Verify user exists and is valid
+                    $users[] = $user_id;
+                }
+            }
+            
+            // Limit bulk operations to 100 users at once
+            if (count($users) > 100) {
+                error_log('SlimWP Security: Bulk operation attempted on ' . count($users) . ' users');
+                wp_die('Bulk operations are limited to 100 users at once for security reasons.', 'Security Limit', array('response' => 400));
+            }
+        }
+        
+        // Log the bulk operation attempt
+        error_log('SlimWP Admin: Bulk operation initiated - Operation: ' . $operation . ', Users: ' . count($users) . ', Amount: ' . $amount . ', Balance Type: ' . $balance_type);
         
         $success = 0;
         $errors = array();

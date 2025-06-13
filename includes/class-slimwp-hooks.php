@@ -74,6 +74,43 @@ class SlimWP_Hooks {
 add_action('slimwp_points_after_registration', function($user_id) {
     // Example: Add extra permanent points based on referral
     if (isset($_COOKIE['referral_code'])) {
-        slimwp_add_user_points($user_id, 50, 'Referral bonus', 'permanent');
+        $referral_code = sanitize_text_field($_COOKIE['referral_code']);
+        
+        // Validate referral code format (alphanumeric, 6-20 characters)
+        if (preg_match('/^[a-zA-Z0-9]{6,20}$/', $referral_code)) {
+            // Check if this user hasn't already used a referral bonus
+            $existing_referral = get_user_meta($user_id, 'slimwp_referral_used', true);
+            
+            if (empty($existing_referral)) {
+                // Rate limiting: Check if this referral code hasn't been used too many times recently
+                $referral_usage_key = 'slimwp_referral_usage_' . $referral_code;
+                $recent_usage = get_transient($referral_usage_key);
+                
+                if ($recent_usage === false || intval($recent_usage) < 10) { // Max 10 uses per hour
+                    // Award referral bonus
+                    $result = slimwp_add_user_points($user_id, 50, 'Referral bonus: ' . $referral_code, 'permanent');
+                    
+                    if (!is_wp_error($result)) {
+                        // Mark user as having used referral
+                        update_user_meta($user_id, 'slimwp_referral_used', $referral_code);
+                        
+                        // Update usage counter
+                        $new_count = intval($recent_usage) + 1;
+                        set_transient($referral_usage_key, $new_count, HOUR_IN_SECONDS);
+                        
+                        // Clear the referral cookie for security
+                        if (!headers_sent()) {
+                            setcookie('referral_code', '', time() - 3600, '/', '', is_ssl(), true);
+                        }
+                        
+                        error_log("SlimWP: Referral bonus awarded to user {$user_id} with code {$referral_code}");
+                    }
+                } else {
+                    error_log("SlimWP: Referral code {$referral_code} usage limit exceeded");
+                }
+            }
+        } else {
+            error_log("SlimWP: Invalid referral code format: {$referral_code}");
+        }
     }
 }, 10, 1);

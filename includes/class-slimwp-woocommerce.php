@@ -174,13 +174,32 @@ class SlimWP_WooCommerce {
      * Save product data
      */
     public function save_product_data($post_id) {
+        // Verify nonce for security
+        if (!isset($_POST['woocommerce_meta_nonce']) || !wp_verify_nonce($_POST['woocommerce_meta_nonce'], 'woocommerce_save_data')) {
+            return;
+        }
+        
+        // Check user permissions
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+        
+        // Verify this is not an autosave
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+        
         // Save points enabled
         $points_enabled = isset($_POST['_slimwp_points_enabled']) ? 'yes' : 'no';
-        update_post_meta($post_id, '_slimwp_points_enabled', $points_enabled);
+        update_post_meta($post_id, '_slimwp_points_enabled', sanitize_text_field($points_enabled));
         
         // Save points amount
         if (isset($_POST['_slimwp_points_amount'])) {
             $points_amount = intval($_POST['_slimwp_points_amount']);
+            // Validate points amount is not negative
+            if ($points_amount < 0) {
+                $points_amount = 0;
+            }
             update_post_meta($post_id, '_slimwp_points_amount', $points_amount);
         }
         

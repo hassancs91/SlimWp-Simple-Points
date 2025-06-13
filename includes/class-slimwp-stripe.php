@@ -214,28 +214,95 @@ class SlimWP_Stripe {
     }
     
     public function handle_webhook() {
+        // Security: Log webhook attempts for monitoring
+        $ip_address = $this->get_client_ip();
+        $user_agent = sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? '');
+        
         $payload = @file_get_contents('php://input');
         $sig_header = $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '';
         $endpoint_secret = $this->get_webhook_secret();
         
+        // Enhanced logging for security monitoring
+        error_log("SlimWP Stripe Webhook: Attempt from IP {$ip_address}, UA: {$user_agent}");
+        
         if (empty($endpoint_secret)) {
+            error_log("SlimWP Stripe Webhook: Missing webhook secret");
             http_response_code(400);
             exit('Webhook secret not configured');
+        }
+        
+        if (empty($payload)) {
+            error_log("SlimWP Stripe Webhook: Empty payload from IP {$ip_address}");
+            http_response_code(400);
+            exit('Empty payload');
+        }
+        
+        if (empty($sig_header)) {
+            error_log("SlimWP Stripe Webhook: Missing signature from IP {$ip_address}");
+            http_response_code(400);
+            exit('Missing signature');
         }
         
         try {
             $this->load_stripe_library();
             $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $endpoint_secret);
         } catch (\UnexpectedValueException $e) {
+            error_log("SlimWP Stripe Webhook: Invalid payload from IP {$ip_address}: " . $e->getMessage());
             http_response_code(400);
             exit('Invalid payload');
         } catch (\Stripe\Exception\SignatureVerificationException $e) {
+            error_log("SlimWP Stripe Webhook: Invalid signature from IP {$ip_address}: " . $e->getMessage());
             http_response_code(400);
             exit('Invalid signature');
         }
         
+        // Replay attack protection: Check event timestamp
+        $event_time = $event['created'] ?? 0;
+        $current_time = time();
+        $time_tolerance = 300; // 5 minutes
+        
+        if (abs($current_time - $event_time) > $time_tolerance) {
+            error_log("SlimWP Stripe Webhook: Event too old or from future. Event time: {$event_time}, Current: {$current_time}");
+            http_response_code(400);
+            exit('Event timestamp out of tolerance');
+        }
+        
+        // Duplicate event protection: Check if we've already processed this event
+        $event_id = $event['id'] ?? '';
+        if (!empty($event_id)) {
+            $processed_key = 'slimwp_stripe_processed_' . $event_id;
+            if (get_transient($processed_key)) {
+                error_log("SlimWP Stripe Webhook: Duplicate event {$event_id} ignored");
+                http_response_code(200);
+                exit('Event already processed');
+            }
+            
+            // Mark event as processed (store for 24 hours)
+            set_transient($processed_key, true, DAY_IN_SECONDS);
+        }
+        
+        // Validate event data structure
+        if (!isset($event['type']) || !isset($event['data']['object'])) {
+            error_log("SlimWP Stripe Webhook: Invalid event structure");
+            http_response_code(400);
+            exit('Invalid event structure');
+        }
+        
+        // Rate limiting: Prevent webhook spam
+        $rate_limit_key = 'slimwp_stripe_webhook_rate_' . md5($ip_address);
+        $current_requests = get_transient($rate_limit_key) ?: 0;
+        
+        if ($current_requests > 100) { // Max 100 requests per hour per IP
+            error_log("SlimWP Stripe Webhook: Rate limit exceeded for IP {$ip_address}");
+            http_response_code(429);
+            exit('Rate limit exceeded');
+        }
+        
+        set_transient($rate_limit_key, $current_requests + 1, HOUR_IN_SECONDS);
+        
         // Handle the event
-        switch ($event['type']) {
+        $event_type = sanitize_text_field($event['type']);
+        switch ($event_type) {
             case 'checkout.session.completed':
                 $this->handle_successful_payment($event['data']['object']);
                 break;
@@ -243,9 +310,10 @@ class SlimWP_Stripe {
                 $this->handle_expired_session($event['data']['object']);
                 break;
             default:
-                error_log('SlimWP Stripe: Unhandled event type ' . $event['type']);
+                error_log("SlimWP Stripe: Unhandled event type {$event_type}");
         }
         
+        error_log("SlimWP Stripe Webhook: Successfully processed {$event_type} event {$event_id}");
         http_response_code(200);
         exit('OK');
     }
@@ -392,5 +460,40 @@ class SlimWP_Stripe {
     
     public function get_webhook_url() {
         return admin_url('admin-ajax.php?action=slimwp_stripe_webhook');
+    }
+    
+    /**
+     * Get client IP address securely
+     */
+    private function get_client_ip() {
+        $ip_keys = array(
+            'HTTP_CF_CONNECTING_IP',     // Cloudflare
+            'HTTP_CLIENT_IP',            // Proxy
+            'HTTP_X_FORWARDED_FOR',      // Load balancer/proxy
+            'HTTP_X_FORWARDED',          // Proxy
+            'HTTP_X_CLUSTER_CLIENT_IP',  // Cluster
+            'HTTP_FORWARDED_FOR',        // Proxy
+            'HTTP_FORWARDED',            // Proxy
+            'REMOTE_ADDR'                // Standard
+        );
+        
+        foreach ($ip_keys as $key) {
+            if (array_key_exists($key, $_SERVER) === true) {
+                $ip = sanitize_text_field($_SERVER[$key]);
+                
+                // Handle comma-separated IPs (X-Forwarded-For can contain multiple IPs)
+                if (strpos($ip, ',') !== false) {
+                    $ip = trim(explode(',', $ip)[0]);
+                }
+                
+                // Validate IP address
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    return $ip;
+                }
+            }
+        }
+        
+        // Fallback to REMOTE_ADDR even if it's private/reserved
+        return sanitize_text_field($_SERVER['REMOTE_ADDR'] ?? 'unknown');
     }
 }

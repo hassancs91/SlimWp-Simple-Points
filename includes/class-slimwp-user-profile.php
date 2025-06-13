@@ -83,14 +83,15 @@ class SlimWP_User_Profile {
                 </div>
                 
                 <div class="balance-input-wrap">
+                    <?php wp_nonce_field('slimwp_update_user_points', 'slimwp_user_points_nonce'); ?>
                     <div class="balance-input-group">
                         <label for="slimwp_points_balance_free">Free Balance</label>
-                        <input type="number" name="slimwp_points_balance_free" id="slimwp_points_balance_free" value="<?php echo $free_balance; ?>" step="0.01" />
+                        <input type="number" name="slimwp_points_balance_free" id="slimwp_points_balance_free" value="<?php echo esc_attr($free_balance); ?>" step="0.01" />
                         <p class="description">This balance can be reset daily/monthly</p>
                     </div>
                     <div class="balance-input-group">
                         <label for="slimwp_points_balance_permanent">Permanent Balance</label>
-                        <input type="number" name="slimwp_points_balance_permanent" id="slimwp_points_balance_permanent" value="<?php echo $permanent_balance; ?>" step="0.01" />
+                        <input type="number" name="slimwp_points_balance_permanent" id="slimwp_points_balance_permanent" value="<?php echo esc_attr($permanent_balance); ?>" step="0.01" />
                         <p class="description">This balance is never automatically reset</p>
                     </div>
                 </div>
@@ -163,41 +164,81 @@ class SlimWP_User_Profile {
     }
     
     public function save_user_points_field($user_id) {
-         if (!current_user_can('edit_users')) {
+        if (!current_user_can('edit_users')) {
             return;
+        }
+        
+        // Verify nonce for security
+        if (!isset($_POST['slimwp_user_points_nonce']) || !wp_verify_nonce($_POST['slimwp_user_points_nonce'], 'slimwp_update_user_points')) {
+            wp_die(__('Security check failed. Please try again.', 'SlimWp-Simple-Points'));
+        }
+        
+        // Additional security: Verify user can edit this specific user
+        if (!current_user_can('edit_user', $user_id)) {
+            wp_die(__('You do not have permission to edit this user.', 'SlimWp-Simple-Points'));
         }
         
         $admin_user = wp_get_current_user()->display_name;
         
         // Handle free balance update
         if (isset($_POST['slimwp_points_balance_free'])) {
-            $new_free_balance = floatval($_POST['slimwp_points_balance_free']);
+            $new_free_balance = floatval(sanitize_text_field($_POST['slimwp_points_balance_free']));
+            
+            // Validate balance is not negative
+            if ($new_free_balance < 0) {
+                wp_die(__('Balance cannot be negative.', 'SlimWp-Simple-Points'));
+            }
+            
+            // Validate balance is not unreasonably large (prevent overflow)
+            if ($new_free_balance > 999999999.99) {
+                wp_die(__('Balance value is too large.', 'SlimWp-Simple-Points'));
+            }
+            
             $current_free_balance = $this->points_system->get_free_balance($user_id);
             
             if ($new_free_balance != $current_free_balance) {
-                $this->points_system->set_balance(
+                $result = $this->points_system->set_balance(
                     $user_id,
                     $new_free_balance,
-                    'Free balance adjustment by ' . $admin_user,
+                    'Free balance adjustment by ' . sanitize_text_field($admin_user),
                     'admin_adjustment',
                     'free'
                 );
+                
+                if (is_wp_error($result)) {
+                    wp_die($result->get_error_message());
+                }
             }
         }
         
         // Handle permanent balance update
         if (isset($_POST['slimwp_points_balance_permanent'])) {
-            $new_permanent_balance = floatval($_POST['slimwp_points_balance_permanent']);
+            $new_permanent_balance = floatval(sanitize_text_field($_POST['slimwp_points_balance_permanent']));
+            
+            // Validate balance is not negative
+            if ($new_permanent_balance < 0) {
+                wp_die(__('Balance cannot be negative.', 'SlimWp-Simple-Points'));
+            }
+            
+            // Validate balance is not unreasonably large (prevent overflow)
+            if ($new_permanent_balance > 999999999.99) {
+                wp_die(__('Balance value is too large.', 'SlimWp-Simple-Points'));
+            }
+            
             $current_permanent_balance = $this->points_system->get_permanent_balance($user_id);
             
             if ($new_permanent_balance != $current_permanent_balance) {
-                $this->points_system->set_balance(
+                $result = $this->points_system->set_balance(
                     $user_id,
                     $new_permanent_balance,
-                    'Permanent balance adjustment by ' . $admin_user,
+                    'Permanent balance adjustment by ' . sanitize_text_field($admin_user),
                     'admin_adjustment',
                     'permanent'
                 );
+                
+                if (is_wp_error($result)) {
+                    wp_die($result->get_error_message());
+                }
             }
         }
     }

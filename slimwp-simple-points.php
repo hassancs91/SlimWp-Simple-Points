@@ -35,6 +35,7 @@ require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-points.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-woocommerce.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe-database.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe-packages.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/functions.php';
 
 // Initialize the plugin

@@ -26,13 +26,24 @@ class SlimWP_Stripe_Packages {
     
     public function packages_page() {
         // Handle form submissions
-        if (isset($_POST['submit']) && check_admin_referer('slimwp_packages')) {
+        if ((isset($_POST['add_package']) || isset($_POST['edit_package'])) && check_admin_referer('slimwp_packages')) {
             $this->handle_package_actions();
         }
         
+        // Handle bulk actions
+        if (isset($_POST['bulk_action']) && check_admin_referer('slimwp_packages_bulk')) {
+            $this->handle_bulk_actions();
+        }
+        
         // Handle individual actions
-        if (isset($_GET['action']) && isset($_GET['package_id']) && check_admin_referer('slimwp_package_action')) {
-            $this->handle_individual_actions();
+        if (isset($_GET['action']) && isset($_GET['package_id']) && isset($_GET['_wpnonce'])) {
+            if (wp_verify_nonce($_GET['_wpnonce'], 'slimwp_package_action')) {
+                $this->handle_individual_actions();
+            } else {
+                add_action('admin_notices', function() {
+                    echo '<div class="notice notice-error is-dismissible"><p>❌ ' . __('Security check failed.', 'SlimWp-Simple-Points') . '</p></div>';
+                });
+            }
         }
         
         $packages = SlimWP_Stripe_Database::get_packages('all');
@@ -131,6 +142,28 @@ class SlimWP_Stripe_Packages {
                         <h2>Existing Packages</h2>
                         
                         <?php if (!empty($packages)): ?>
+                            <?php if (count($packages) > 5): ?>
+                                <div class="warning-box">
+                                    <strong><?php _e('⚠️ Multiple Packages Detected:', 'SlimWp-Simple-Points'); ?></strong>
+                                    <?php printf(__('You have %d packages. If these were created automatically, you can use the bulk delete option below to clean them up.', 'SlimWp-Simple-Points'), count($packages)); ?>
+                                </div>
+                                
+                                <form method="post" style="margin-bottom: 20px;">
+                                    <?php wp_nonce_field('slimwp_packages_bulk'); ?>
+                                    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                        <button type="submit" name="bulk_action" value="delete_all" class="btn btn-danger"
+                                                onclick="return confirm('<?php _e('Are you sure you want to delete ALL packages? This action cannot be undone.', 'SlimWp-Simple-Points'); ?>')">
+                                            <?php _e('Delete All Packages', 'SlimWp-Simple-Points'); ?>
+                                        </button>
+                                        <button type="submit" name="bulk_action" value="delete_duplicates" class="btn btn-secondary"
+                                                onclick="return confirm('<?php _e('This will keep only the first package of each name and delete duplicates. Continue?', 'SlimWp-Simple-Points'); ?>')">
+                                            <?php _e('Delete Duplicate Packages', 'SlimWp-Simple-Points'); ?>
+                                        </button>
+                                        <span style="font-size: 13px; color: #50575e;"><?php _e('Use these options to clean up automatically created packages', 'SlimWp-Simple-Points'); ?></span>
+                                    </div>
+                                </form>
+                            <?php endif; ?>
+                            
                             <div style="overflow-x: auto;">
                                 <table class="packages-table">
                                     <thead>
@@ -340,11 +373,11 @@ class SlimWP_Stripe_Packages {
         
         if (isset($_POST['add_package'])) {
             $package_data = array(
-                'name' => sanitize_text_field($_POST['package_name']),
-                'description' => sanitize_textarea_field($_POST['package_description']),
-                'points' => intval($_POST['package_points']),
-                'price' => floatval($_POST['package_price']),
-                'currency' => $stripe_settings['currency'],
+                'name' => sanitize_text_field($_POST['package_name'] ?? ''),
+                'description' => sanitize_textarea_field($_POST['package_description'] ?? ''),
+                'points' => intval($_POST['package_points'] ?? 0),
+                'price' => floatval($_POST['package_price'] ?? 0),
+                'currency' => $stripe_settings['currency'] ?? 'USD',
                 'status' => 'active'
             );
             
@@ -352,8 +385,13 @@ class SlimWP_Stripe_Packages {
                 $result = SlimWP_Stripe_Database::create_package($package_data);
                 if ($result) {
                     echo '<div class="notice notice-success is-dismissible" style="margin: 20px 20px 0;"><p>✅ ' . __('Package created successfully!', 'SlimWp-Simple-Points') . '</p></div>';
+                    
+                    // Redirect to prevent form resubmission
+                    echo '<script>window.location.href = "' . admin_url('admin.php?page=slimwp-stripe-packages') . '";</script>';
                 } else {
-                    echo '<div class="notice notice-error is-dismissible" style="margin: 20px 20px 0;"><p>❌ ' . __('Failed to create package.', 'SlimWp-Simple-Points') . '</p></div>';
+                    global $wpdb;
+                    $error = $wpdb->last_error;
+                    echo '<div class="notice notice-error is-dismissible" style="margin: 20px 20px 0;"><p>❌ ' . __('Failed to create package.', 'SlimWp-Simple-Points') . ' ' . ($error ? 'Error: ' . esc_html($error) : '') . '</p></div>';
                 }
             } else {
                 echo '<div class="notice notice-error is-dismissible" style="margin: 20px 20px 0;"><p>❌ ' . __('Please fill in all required fields.', 'SlimWp-Simple-Points') . '</p></div>';
@@ -420,5 +458,61 @@ class SlimWP_Stripe_Packages {
         // Redirect to remove the action from URL
         wp_redirect(admin_url('admin.php?page=slimwp-stripe-packages'));
         exit;
+    }
+    
+    private function handle_bulk_actions() {
+        $action = sanitize_text_field($_POST['bulk_action']);
+        
+        switch ($action) {
+            case 'delete_all':
+                $result = $this->delete_all_packages();
+                $message = $result ? __('All packages deleted successfully!', 'SlimWp-Simple-Points') : __('Failed to delete packages.', 'SlimWp-Simple-Points');
+                break;
+                
+            case 'delete_duplicates':
+                $result = $this->delete_duplicate_packages();
+                $message = $result ? __('Duplicate packages deleted successfully!', 'SlimWp-Simple-Points') : __('Failed to delete duplicate packages.', 'SlimWp-Simple-Points');
+                break;
+                
+            default:
+                return;
+        }
+        
+        $notice_class = $result ? 'notice-success' : 'notice-error';
+        $icon = $result ? '✅' : '❌';
+        
+        add_action('admin_notices', function() use ($message, $notice_class, $icon) {
+            echo '<div class="notice ' . $notice_class . ' is-dismissible"><p>' . $icon . ' ' . $message . '</p></div>';
+        });
+        
+        // Redirect to remove the action from URL
+        wp_redirect(admin_url('admin.php?page=slimwp-stripe-packages'));
+        exit;
+    }
+    
+    private function delete_all_packages() {
+        global $wpdb;
+        
+        $packages_table = $wpdb->prefix . 'slimwp_stripe_packages';
+        
+        // Delete all packages
+        $result = $wpdb->query("DELETE FROM {$packages_table}");
+        
+        return $result !== false;
+    }
+    
+    private function delete_duplicate_packages() {
+        global $wpdb;
+        
+        $packages_table = $wpdb->prefix . 'slimwp_stripe_packages';
+        
+        // Keep only the first package of each name (by ID)
+        $sql = "DELETE p1 FROM {$packages_table} p1
+                INNER JOIN {$packages_table} p2 
+                WHERE p1.id > p2.id AND p1.name = p2.name";
+        
+        $result = $wpdb->query($sql);
+        
+        return $result !== false;
     }
 }

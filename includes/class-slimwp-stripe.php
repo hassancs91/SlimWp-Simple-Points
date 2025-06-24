@@ -434,7 +434,7 @@ class SlimWP_Stripe {
     }
     
     private function is_enabled() {
-        return !empty($this->settings['enabled']) && $this->settings['enabled'] === '1';
+        return !empty($this->settings['enabled']) && ($this->settings['enabled'] === '1' || $this->settings['enabled'] === true);
     }
     
     private function get_publishable_key() {

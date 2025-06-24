@@ -14,15 +14,16 @@
 
 
 // Include the update checker
-require_once 'lib/plugin-update-checker-master/plugin-update-checker.php';
+// Include the update checker
+require_once 'plugin-update-checker-master/plugin-update-checker.php';
 
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
 // Setup the update checker
 $myUpdateChecker = PucFactory::buildUpdateChecker(
-    'https://github.com/hassancs91/TubeDigest/',
+    'https://github.com/hassancs91/SlimWp-Simple-Points/',
     __FILE__,
-    'tube-digest'
+    'slimwp-simple-points'
 );
 
 // Set authentication token for private repo

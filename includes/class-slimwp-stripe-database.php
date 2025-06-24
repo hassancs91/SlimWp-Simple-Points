@@ -52,9 +52,6 @@ class SlimWP_Stripe_Database {
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($packages_sql);
         dbDelta($purchases_sql);
-        
-        // Create default packages if none exist
-        self::create_default_packages();
     }
     
     private static function create_default_packages() {
@@ -68,8 +65,8 @@ class SlimWP_Stripe_Database {
             return false;
         }
         
-        // Check if any packages exist using prepared statement
-        $existing_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM `%s`", $packages_table));
+        // Check if any packages exist
+        $existing_count = $wpdb->get_var("SELECT COUNT(*) FROM {$packages_table}");
         
         if ($existing_count == 0) {
             // Create some default packages

@@ -54,7 +54,7 @@ class SlimWP_Settings {
             
             // Save Stripe settings
             $stripe_settings = array(
-                'enabled' => isset($_POST['stripe']['enabled']),
+                'enabled' => isset($_POST['stripe']['enabled']) ? '1' : '0',
                 'mode' => sanitize_text_field($_POST['stripe_mode']),
                 'test_publishable_key' => sanitize_text_field($_POST['stripe_test_publishable_key']),
                 'test_secret_key' => sanitize_text_field($_POST['stripe_test_secret_key']),
@@ -386,7 +386,7 @@ class SlimWP_Settings {
                                 </div>
                                 <div class="settings-control">
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="stripe[enabled]" value="1" <?php checked($stripe_settings['enabled']); ?>>
+                                        <input type="checkbox" name="stripe[enabled]" value="1" <?php checked($stripe_settings['enabled'], '1'); ?>>
                                         <span class="toggle-slider"></span>
                                     </label>
                                     <div class="info-box">

@@ -12,6 +12,28 @@
  * Domain Path: /languages
  */
 
+
+// Include the update checker
+require_once 'lib/plugin-update-checker-master/plugin-update-checker.php';
+
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+// Setup the update checker
+$myUpdateChecker = PucFactory::buildUpdateChecker(
+    'https://github.com/hassancs91/TubeDigest/',
+    __FILE__,
+    'tube-digest'
+);
+
+// Set authentication token for private repo
+$myUpdateChecker->setAuthentication('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');
+
+// Set the branch to main (or master, depending on your repository)
+$myUpdateChecker->setBranch('main');
+
+
+
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;

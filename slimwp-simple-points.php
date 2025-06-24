@@ -3,7 +3,7 @@
  * Plugin Name: SlimWP Simple Points
  * Plugin URI: https://yourwebsite.com/slimwp-simple-points
  * Description: A lightweight dual-balance points system for WordPress with free and permanent points tracking.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Your Name
  * Author URI: https://yourwebsite.com
  * License: GPL v2 or later

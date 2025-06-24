@@ -133,31 +133,85 @@ class SlimWP_Stripe {
     }
     
     public function create_checkout_session() {
+        // Log the start of the function
+        error_log('SlimWP Stripe: create_checkout_session called');
+        
+        // Check if POST data exists
+        if (empty($_POST)) {
+            error_log('SlimWP Stripe Error: No POST data received');
+            wp_send_json_error('No data received');
+            return;
+        }
+        
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'slimwp_stripe_nonce')) {
-            wp_die('Security check failed');
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'slimwp_stripe_nonce')) {
+            error_log('SlimWP Stripe Error: Nonce verification failed');
+            wp_send_json_error('Security check failed');
+            return;
         }
         
         if (!is_user_logged_in()) {
+            error_log('SlimWP Stripe Error: User not logged in');
             wp_send_json_error('User must be logged in');
+            return;
+        }
+        
+        // Validate package ID
+        if (!isset($_POST['package_id'])) {
+            error_log('SlimWP Stripe Error: No package_id provided');
+            wp_send_json_error('Package ID missing');
+            return;
         }
         
         $package_id = intval($_POST['package_id']);
+        error_log('SlimWP Stripe: Processing package ID: ' . $package_id);
+        
         $package = SlimWP_Stripe_Database::get_package($package_id);
         
-        if (!$package || $package->status !== 'active') {
-            wp_send_json_error('Invalid package');
+        if (!$package) {
+            error_log('SlimWP Stripe Error: Package not found for ID: ' . $package_id);
+            wp_send_json_error('Package not found');
+            return;
+        }
+        
+        if ($package->status !== 'active') {
+            error_log('SlimWP Stripe Error: Package not active for ID: ' . $package_id);
+            wp_send_json_error('Package not available');
+            return;
+        }
+        
+        // Check Stripe settings
+        $secret_key = $this->get_secret_key();
+        if (empty($secret_key)) {
+            error_log('SlimWP Stripe Error: Secret key not configured');
+            wp_send_json_error('Payment system not configured');
+            return;
         }
         
         try {
+            // Load Stripe library
             $this->load_stripe_library();
-            \Stripe\Stripe::setApiKey($this->get_secret_key());
+            
+            if (!class_exists('\Stripe\Stripe')) {
+                error_log('SlimWP Stripe Error: Stripe library not loaded');
+                wp_send_json_error('Payment library not available');
+                return;
+            }
+            
+            \Stripe\Stripe::setApiKey($secret_key);
+            error_log('SlimWP Stripe: API key set successfully');
             
             $user_id = get_current_user_id();
             $user = get_userdata($user_id);
             
-            // Create checkout session
-            $session = \Stripe\Checkout\Session::create([
+            if (!$user) {
+                error_log('SlimWP Stripe Error: Could not get user data for ID: ' . $user_id);
+                wp_send_json_error('User data not available');
+                return;
+            }
+            
+            // Prepare session data
+            $session_data = [
                 'payment_method_types' => ['card'],
                 'line_items' => [[
                     'price_data' => [
@@ -189,10 +243,17 @@ class SlimWP_Stripe {
                     'points' => $package->points,
                     'site_url' => home_url()
                 ]
-            ]);
+            ];
+            
+            error_log('SlimWP Stripe: Creating checkout session with data: ' . json_encode($session_data));
+            
+            // Create checkout session
+            $session = \Stripe\Checkout\Session::create($session_data);
+            
+            error_log('SlimWP Stripe: Checkout session created with ID: ' . $session->id);
             
             // Store pending purchase
-            SlimWP_Stripe_Database::create_purchase(array(
+            $purchase_data = array(
                 'user_id' => $user_id,
                 'package_id' => $package_id,
                 'stripe_session_id' => $session->id,
@@ -201,15 +262,30 @@ class SlimWP_Stripe {
                 'currency' => $package->currency,
                 'points_awarded' => $package->points,
                 'status' => 'pending'
-            ));
+            );
+            
+            $purchase_result = SlimWP_Stripe_Database::create_purchase($purchase_data);
+            
+            if (!$purchase_result) {
+                error_log('SlimWP Stripe Error: Failed to create purchase record');
+                wp_send_json_error('Failed to create purchase record');
+                return;
+            }
+            
+            error_log('SlimWP Stripe: Purchase record created with ID: ' . $purchase_result);
             
             wp_send_json_success(array(
                 'session_id' => $session->id
             ));
             
+        } catch (\Stripe\Exception\ApiErrorException $e) {
+            error_log('SlimWP Stripe API Error: ' . $e->getMessage());
+            error_log('SlimWP Stripe API Error Code: ' . $e->getStripeCode());
+            wp_send_json_error('Stripe API error: ' . $e->getMessage());
         } catch (Exception $e) {
-            error_log('SlimWP Stripe Error: ' . $e->getMessage());
-            wp_send_json_error('Payment processing error');
+            error_log('SlimWP Stripe General Error: ' . $e->getMessage());
+            error_log('SlimWP Stripe Error Trace: ' . $e->getTraceAsString());
+            wp_send_json_error('Payment processing error: ' . $e->getMessage());
         }
     }
     

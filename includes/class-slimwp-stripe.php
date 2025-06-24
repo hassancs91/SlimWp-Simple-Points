@@ -22,6 +22,9 @@ class SlimWP_Stripe {
         add_action('wp_ajax_slimwp_stripe_webhook', array($this, 'handle_webhook'));
         add_action('wp_ajax_nopriv_slimwp_stripe_webhook', array($this, 'handle_webhook'));
         
+        // Debug handler
+        add_action('wp_ajax_slimwp_debug_stripe', array($this, 'debug_stripe_config'));
+        
         // Shortcode
         add_shortcode('slimwp_stripe_packages', array($this, 'packages_shortcode'));
         
@@ -136,6 +139,13 @@ class SlimWP_Stripe {
         // Log the start of the function
         error_log('SlimWP Stripe: create_checkout_session called');
         
+        // Check if Stripe is enabled
+        if (!$this->is_enabled()) {
+            error_log('SlimWP Stripe Error: Stripe integration is disabled');
+            wp_send_json_error('Payment system is currently disabled');
+            return;
+        }
+        
         // Check if POST data exists
         if (empty($_POST)) {
             error_log('SlimWP Stripe Error: No POST data received');
@@ -166,6 +176,14 @@ class SlimWP_Stripe {
         $package_id = intval($_POST['package_id']);
         error_log('SlimWP Stripe: Processing package ID: ' . $package_id);
         
+        // Check if packages exist at all
+        $all_packages = SlimWP_Stripe_Database::get_packages('all');
+        if (empty($all_packages)) {
+            error_log('SlimWP Stripe Error: No packages found in database');
+            wp_send_json_error('No packages available. Please contact the administrator.');
+            return;
+        }
+        
         $package = SlimWP_Stripe_Database::get_package($package_id);
         
         if (!$package) {
@@ -181,10 +199,18 @@ class SlimWP_Stripe {
         }
         
         // Check Stripe settings
+        $publishable_key = $this->get_publishable_key();
         $secret_key = $this->get_secret_key();
+        
+        if (empty($publishable_key)) {
+            error_log('SlimWP Stripe Error: Publishable key not configured');
+            wp_send_json_error('Payment system not configured (missing publishable key)');
+            return;
+        }
+        
         if (empty($secret_key)) {
             error_log('SlimWP Stripe Error: Secret key not configured');
-            wp_send_json_error('Payment system not configured');
+            wp_send_json_error('Payment system not configured (missing secret key)');
             return;
         }
         
@@ -536,6 +562,57 @@ class SlimWP_Stripe {
     
     public function get_webhook_url() {
         return admin_url('admin-ajax.php?action=slimwp_stripe_webhook');
+    }
+    
+    /**
+     * Debug function to check Stripe configuration
+     * Can be called via AJAX for troubleshooting
+     */
+    public function debug_stripe_config() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Unauthorized');
+            return;
+        }
+        
+        $debug_info = array();
+        
+        // Check if Stripe is enabled
+        $debug_info['stripe_enabled'] = $this->is_enabled();
+        
+        // Check API keys
+        $debug_info['publishable_key_set'] = !empty($this->get_publishable_key());
+        $debug_info['secret_key_set'] = !empty($this->get_secret_key());
+        $debug_info['webhook_secret_set'] = !empty($this->get_webhook_secret());
+        
+        // Check current mode
+        $debug_info['current_mode'] = $this->settings['mode'] ?? 'test';
+        
+        // Check if Stripe library loads
+        try {
+            $this->load_stripe_library();
+            $debug_info['stripe_library_loaded'] = class_exists('\Stripe\Stripe');
+        } catch (Exception $e) {
+            $debug_info['stripe_library_loaded'] = false;
+            $debug_info['stripe_library_error'] = $e->getMessage();
+        }
+        
+        // Check database tables
+        global $wpdb;
+        $packages_table = $wpdb->prefix . 'slimwp_stripe_packages';
+        $purchases_table = $wpdb->prefix . 'slimwp_stripe_purchases';
+        
+        $debug_info['packages_table_exists'] = $wpdb->get_var("SHOW TABLES LIKE '{$packages_table}'") === $packages_table;
+        $debug_info['purchases_table_exists'] = $wpdb->get_var("SHOW TABLES LIKE '{$purchases_table}'") === $purchases_table;
+        
+        // Check packages
+        $packages = SlimWP_Stripe_Database::get_packages('all');
+        $debug_info['total_packages'] = count($packages);
+        $debug_info['active_packages'] = count(SlimWP_Stripe_Database::get_packages('active'));
+        
+        // Check settings
+        $debug_info['all_settings'] = array_keys($this->settings);
+        
+        wp_send_json_success($debug_info);
     }
     
     /**

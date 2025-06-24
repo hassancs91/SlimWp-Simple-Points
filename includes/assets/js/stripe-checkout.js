@@ -10,13 +10,16 @@ jQuery(document).ready(function($) {
         e.preventDefault();
         
         if (!stripe) {
-            alert(slimwp_stripe.error_text);
+            console.error('SlimWP Stripe: Stripe not initialized. Check publishable key.');
+            alert('Stripe is not properly configured. Please contact the site administrator.');
             return;
         }
         
         const button = $(this);
         const packageId = button.data('package-id');
         const packageName = button.data('package-name');
+        
+        console.log('SlimWP Stripe: Processing purchase for package ID:', packageId);
         
         // Disable button and show loading state
         button.prop('disabled', true);
@@ -33,21 +36,46 @@ jQuery(document).ready(function($) {
                 nonce: slimwp_stripe.nonce
             },
             success: function(response) {
+                console.log('SlimWP Stripe: AJAX response:', response);
+                
                 if (response.success) {
+                    console.log('SlimWP Stripe: Redirecting to checkout with session ID:', response.data.session_id);
                     // Redirect to Stripe Checkout
                     stripe.redirectToCheckout({
                         sessionId: response.data.session_id
                     }).then(function(result) {
                         if (result.error) {
-                            alert(result.error.message);
+                            console.error('SlimWP Stripe: Checkout error:', result.error);
+                            alert('Checkout error: ' + result.error.message);
                         }
                     });
                 } else {
-                    alert(response.data || slimwp_stripe.error_text);
+                    console.error('SlimWP Stripe: Server error:', response.data);
+                    const errorMessage = response.data || slimwp_stripe.error_text;
+                    alert('Error: ' + errorMessage);
                 }
             },
-            error: function() {
-                alert(slimwp_stripe.error_text);
+            error: function(xhr, status, error) {
+                console.error('SlimWP Stripe: AJAX error:', {
+                    status: status,
+                    error: error,
+                    responseText: xhr.responseText
+                });
+                
+                let errorMessage = slimwp_stripe.error_text;
+                if (xhr.responseText) {
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        if (errorResponse.data) {
+                            errorMessage = errorResponse.data;
+                        }
+                    } catch (e) {
+                        // If not JSON, show the raw response
+                        errorMessage = xhr.responseText.substring(0, 100) + '...';
+                    }
+                }
+                
+                alert('Network error: ' + errorMessage);
             },
             complete: function() {
                 // Re-enable button

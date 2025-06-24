@@ -52,6 +52,9 @@ class SlimWP_Stripe_Database {
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($packages_sql);
         dbDelta($purchases_sql);
+        
+        // Create default packages after tables are created
+        self::create_default_packages();
     }
     
     private static function create_default_packages() {

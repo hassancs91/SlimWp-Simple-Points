@@ -4,8 +4,8 @@
  * Plugin URI: https://yourwebsite.com/slimwp-simple-points
  * Description: A lightweight dual-balance points system for WordPress with free and permanent points tracking.
  * Version: 1.0.5
- * Author: Your Name
- * Author URI: https://yourwebsite.com
+ * Author: Hasan Aboul Hasan
+ * Author URI: https://learnwithhasan.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: SlimWp-Simple-Points

@@ -225,6 +225,22 @@ class SlimWP_Stripe {
             }
             
             \Stripe\Stripe::setApiKey($secret_key);
+            
+            // Configure SSL for local development environments
+            $is_local = (
+                defined('WP_DEBUG') && WP_DEBUG ||
+                strpos(home_url(), 'localhost') !== false ||
+                strpos(home_url(), '127.0.0.1') !== false ||
+                strpos(home_url(), '.local') !== false ||
+                strpos(home_url(), '.test') !== false
+            );
+            
+            if ($is_local) {
+                // In local development, disable SSL verification
+                \Stripe\Stripe::setVerifySslCerts(false);
+                error_log('SlimWP Stripe: SSL verification disabled for local development');
+            }
+            
             error_log('SlimWP Stripe: API key set successfully');
             
             $user_id = get_current_user_id();

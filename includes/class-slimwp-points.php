@@ -43,6 +43,7 @@ class SlimWP_Points {
         if (is_admin()) {
             $this->admin = new SlimWP_Admin($this);
             $this->settings = new SlimWP_Settings($this);
+            $this->documentation = new SlimWP_Documentation();
             $this->stripe_packages = new SlimWP_Stripe_Packages($this);
         }
         

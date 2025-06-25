@@ -42,9 +42,17 @@ class SlimWP_Settings {
             );
             update_option($this->hooks_option, $hooks);
             
-            // Save WooCommerce settings
+            // Save WooCommerce settings with dependency validation
+            $woocommerce_enabled = isset($_POST['woocommerce']['enabled']);
+            
+            // Prevent enabling WooCommerce integration if dependencies not met
+            if ($woocommerce_enabled && !slimwp_can_enable_woocommerce_integration()) {
+                $woocommerce_enabled = false;
+                $woocommerce_error = true;
+            }
+            
             $woocommerce_settings = array(
-                'enabled' => isset($_POST['woocommerce']['enabled']),
+                'enabled' => $woocommerce_enabled,
                 'default_points' => intval($_POST['woocommerce_default_points']),
                 'award_on_status' => sanitize_text_field($_POST['woocommerce_award_on_status']),
                 'show_on_checkout' => isset($_POST['woocommerce']['show_on_checkout']),
@@ -68,7 +76,12 @@ class SlimWP_Settings {
             update_option('slimwp_stripe_settings', $stripe_settings);
             
             
-            echo '<div class="notice notice-success is-dismissible" style="margin: 20px 20px 0;"><p>✅ Settings saved successfully!</p></div>';
+            // Show appropriate success/error messages
+            if (isset($woocommerce_error)) {
+                echo '<div class="notice notice-error is-dismissible" style="margin: 20px 20px 0;"><p>❌ Settings saved, but WooCommerce integration could not be enabled. Please install and activate WooCommerce first.</p></div>';
+            } else {
+                echo '<div class="notice notice-success is-dismissible" style="margin: 20px 20px 0;"><p>✅ Settings saved successfully!</p></div>';
+            }
         }
         
         $hooks = get_option($this->hooks_option, array(
@@ -132,18 +145,9 @@ class SlimWP_Settings {
             .points-input select { padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px; font-size: 14px; }
             .points-input input:focus, .points-input select:focus { border-color: #2271b1; outline: none; box-shadow: 0 0 0 1px #2271b1; }
             .balance-type-selector { margin-top: 8px; }
-            .usage-examples { background: #f6f7f7; border-radius: 8px; padding: 24px; margin-top: 16px; }
-            .usage-examples h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; color: #1d2327; }
-            .code-example { background: #1d2327; color: #fff; padding: 16px 20px; border-radius: 4px; margin-bottom: 16px; font-family: 'Monaco', 'Consolas', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; }
-            .code-example strong { color: #72aee6; font-weight: normal; }
-            .code-comment { color: #8b8b8b; }
             .submit-wrap { margin-top: 32px; padding-top: 24px; border-top: 1px solid #e1e1e1; }
             .button-primary { background: #2271b1; border-color: #2271b1; color: #fff; padding: 8px 24px; font-size: 14px; font-weight: 500; border-radius: 4px; transition: background 0.2s; }
             .button-primary:hover { background: #135e96; border-color: #135e96; }
-            .api-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-            .api-card { background: #fff; border: 1px solid #e1e1e1; border-radius: 4px; padding: 16px; }
-            .api-card h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #1d2327; }
-            .api-card code { background: #f0f0f1; padding: 2px 4px; border-radius: 2px; font-size: 12px; }
             .warning-box { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px 16px; margin-top: 12px; font-size: 13px; color: #856404; }
             .warning-box strong { color: #856404; }
             .info-box { background: #e7f2fd; border: 1px solid #bee5eb; border-radius: 4px; padding: 12px 16px; margin-top: 12px; font-size: 13px; color: #004085; }
@@ -160,9 +164,6 @@ class SlimWP_Settings {
                 .settings-label { flex: none; padding-right: 0; margin-bottom: 12px; }
                 .points-input { flex-direction: column; align-items: flex-start; }
                 .points-input input { width: 100px; }
-                .api-grid { grid-template-columns: 1fr; }
-                .usage-examples { padding: 16px; }
-                .code-example { padding: 12px 16px; font-size: 12px; }
             }
         </style>
         
@@ -231,9 +232,6 @@ class SlimWP_Settings {
                         <div class="settings-card">
                             <h2>Balance Reset Features</h2>
                             
-                            <div class="info-box">
-                                <strong>ℹ️ Note:</strong> Balance resets only affect the Free Balance. Permanent Balance is never reset.
-                            </div>
                             
                             <div class="settings-row">
                                 <div class="settings-label">
@@ -249,9 +247,6 @@ class SlimWP_Settings {
                                         <span>Set free balance to</span>
                                         <input type="number" name="daily_reset_points" value="<?php echo $hooks['daily_reset_points']; ?>" min="0">
                                         <span>points on daily login</span>
-                                    </div>
-                                    <div class="warning-box">
-                                        <strong>⚠️ Warning:</strong> This will REPLACE the user's free balance, not add to it. Permanent balance remains untouched.
                                     </div>
                                 </div>
                             </div>
@@ -271,9 +266,6 @@ class SlimWP_Settings {
                                         <input type="number" name="monthly_reset_points" value="<?php echo $hooks['monthly_reset_points']; ?>" min="0">
                                         <span>points on monthly login</span>
                                     </div>
-                                    <div class="warning-box">
-                                        <strong>⚠️ Warning:</strong> This will REPLACE the user's free balance, not add to it. Permanent balance remains untouched.
-                                    </div>
                                 </div>
                             </div>
                             
@@ -285,9 +277,25 @@ class SlimWP_Settings {
                         <div class="settings-card">
                             <h2>🛒 WooCommerce Integration</h2>
                             
-                            <?php if (!class_exists('WooCommerce')): ?>
+                            <?php 
+                            $wc_status = slimwp_get_woocommerce_status_message();
+                            if ($wc_status['status'] !== 'active'): 
+                            ?>
                                 <div class="warning-box">
-                                    <strong>⚠️ WooCommerce Not Found:</strong> WooCommerce plugin is required for this integration to work. Please install and activate WooCommerce first.
+                                    <?php if ($wc_status['status'] === 'missing'): ?>
+                                        <strong>⚠️ WooCommerce Not Found:</strong> <?php echo esc_html($wc_status['message']); ?>
+                                        <br><strong>Action Required:</strong> <?php echo esc_html($wc_status['action']); ?>
+                                        <br><a href="<?php echo admin_url('plugin-install.php?tab=plugin-information&plugin=woocommerce'); ?>" target="_blank" class="button button-secondary" style="margin-top: 10px;">Install WooCommerce</a>
+                                    <?php elseif ($wc_status['status'] === 'outdated'): ?>
+                                        <strong>⚠️ WooCommerce Outdated:</strong> <?php echo esc_html($wc_status['message']); ?>
+                                        <br><strong>Action Required:</strong> <?php echo esc_html($wc_status['action']); ?>
+                                        <br><a href="<?php echo admin_url('plugins.php'); ?>" class="button button-secondary" style="margin-top: 10px;">Update WooCommerce</a>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="info-box">
+                                    <strong>✅ WooCommerce Ready:</strong> <?php echo esc_html($wc_status['message']); ?>
+                                    <br><?php echo esc_html($wc_status['action']); ?>
                                 </div>
                             <?php endif; ?>
                             
@@ -298,16 +306,16 @@ class SlimWP_Settings {
                                 </div>
                                 <div class="settings-control">
                                     <label class="toggle-switch">
-                                        <input type="checkbox" name="woocommerce[enabled]" value="1" <?php checked($woocommerce_settings['enabled']); ?>>
-                                        <span class="toggle-slider"></span>
+                                        <input type="checkbox" name="woocommerce[enabled]" value="1" 
+                                               <?php checked($woocommerce_settings['enabled']); ?>
+                                               <?php disabled(!slimwp_can_enable_woocommerce_integration()); ?>>
+                                        <span class="toggle-slider <?php echo !slimwp_can_enable_woocommerce_integration() ? 'disabled' : ''; ?>"></span>
                                     </label>
-                                    <div class="info-box">
-                                        <strong>ℹ️ How it works:</strong><br>
-                                        • Add a "SlimWP Points" tab to digital product edit pages<br>
-                                        • Set points amount per product<br>
-                                        • Points awarded when order status = "completed"<br>
-                                        • Points go to customer's <strong>permanent balance</strong>
-                                    </div>
+                                    <?php if (!slimwp_can_enable_woocommerce_integration()): ?>
+                                        <p class="description" style="color: #d63638; font-weight: 500;">
+                                            ⚠️ Install and activate WooCommerce to enable this integration.
+                                        </p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             
@@ -336,11 +344,6 @@ class SlimWP_Settings {
                                             <option value="processing" <?php selected(isset($woocommerce_settings['award_on_status']) ? $woocommerce_settings['award_on_status'] : 'completed', 'processing'); ?>>Processing (Immediate)</option>
                                             <option value="completed" <?php selected(isset($woocommerce_settings['award_on_status']) ? $woocommerce_settings['award_on_status'] : 'completed', 'completed'); ?>>Completed (Manual)</option>
                                         </select>
-                                    </div>
-                                    <div class="info-box">
-                                        <strong>📋 Order Status Guide:</strong><br>
-                                        • <strong>Processing:</strong> Points awarded immediately after purchase (automatic)<br>
-                                        • <strong>Completed:</strong> Points awarded when you manually complete the order (manual control)
                                     </div>
                                 </div>
                             </div>
@@ -389,13 +392,6 @@ class SlimWP_Settings {
                                         <input type="checkbox" name="stripe[enabled]" value="1" <?php checked($stripe_settings['enabled'], '1'); ?>>
                                         <span class="toggle-slider"></span>
                                     </label>
-                                    <div class="info-box">
-                                        <strong>ℹ️ How it works:</strong><br>
-                                        • Users purchase points packages via secure Stripe checkout<br>
-                                        • Points are automatically added to <strong>permanent balance</strong><br>
-                                        • Use shortcode <code>[slimwp_stripe_packages]</code> to display packages<br>
-                                        • Webhook verification ensures secure transactions
-                                    </div>
                                 </div>
                             </div>
                             
@@ -414,9 +410,6 @@ class SlimWP_Settings {
                                             <input type="radio" name="stripe_mode" value="live" <?php checked($stripe_settings['mode'], 'live'); ?>>
                                             Live Mode
                                         </label>
-                                    </div>
-                                    <div class="warning-box">
-                                        <strong>⚠️ Important:</strong> Always test thoroughly in test mode before switching to live mode.
                                     </div>
                                 </div>
                             </div>
@@ -497,15 +490,6 @@ class SlimWP_Settings {
                                 </div>
                                 <div class="settings-control">
                                     <textarea name="stripe_email_template" rows="8" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px; font-family: monospace; font-size: 13px;"><?php echo esc_textarea($stripe_settings['email_template']); ?></textarea>
-                                    <div class="info-box">
-                                        <strong>📧 Available placeholders:</strong><br>
-                                        <code>{user_name}</code> - Customer's display name<br>
-                                        <code>{points}</code> - Points purchased<br>
-                                        <code>{amount}</code> - Amount paid<br>
-                                        <code>{currency}</code> - Currency code<br>
-                                        <code>{site_name}</code> - Your site name<br>
-                                        <code>{site_url}</code> - Your site URL
-                                    </div>
                                 </div>
                             </div>
                             
@@ -517,14 +501,6 @@ class SlimWP_Settings {
                                 <div class="settings-control">
                                     <input type="text" value="<?php echo admin_url('admin-ajax.php?action=slimwp_stripe_webhook'); ?>" readonly 
                                            style="width: 100%; padding: 8px 12px; border: 1px solid #dcdcde; border-radius: 4px; background: #f6f7f7;">
-                                    <div class="info-box">
-                                        <strong>🔗 Setup Instructions:</strong><br>
-                                        1. Go to your Stripe Dashboard → Webhooks<br>
-                                        2. Click "Add endpoint"<br>
-                                        3. Paste the URL above<br>
-                                        4. Select events: <code>checkout.session.completed</code> and <code>checkout.session.expired</code><br>
-                                        5. Copy the webhook secret and paste it in the API keys section above
-                                    </div>
                                 </div>
                             </div>
                             
@@ -535,127 +511,6 @@ class SlimWP_Settings {
                         
                     </form>
                     
-                    <div class="settings-card">
-                        <h2>🚀 Developer Documentation</h2>
-                        
-                        <div class="usage-examples">
-                            <h3>Quick Start Guide - Dual Balance System</h3>
-                            
-                            <div class="code-example">
-<strong>// Get user's total balance (free + permanent)</strong>
-$balance = slimwp()->get_balance($user_id);
-<span class="code-comment">// or use the helper function</span>
-$balance = slimwp_get_user_points($user_id);
-
-<strong>// Get individual balances</strong>
-$free_balance = slimwp()->get_free_balance($user_id);
-$permanent_balance = slimwp()->get_permanent_balance($user_id);
-                            </div>
-                            
-                            <div class="code-example">
-<strong>// Add points to specific balance</strong>
-<span class="code-comment">// Add to free balance (default)</span>
-slimwp()->add_points($user_id, 50, 'Daily bonus', 'daily_login', 'free');
-
-<span class="code-comment">// Add to permanent balance</span>
-slimwp()->add_points($user_id, 100, 'Achievement unlocked', 'achievement', 'permanent');
-                            </div>
-                            
-                            <div class="code-example">
-<strong>// Subtract points (automatically deducts from free first, then permanent)</strong>
-slimwp()->subtract_points($user_id, 75, 'Premium feature usage');
-<span class="code-comment">// If user has 50 free + 100 permanent, this will:</span>
-<span class="code-comment">// - Deduct 50 from free (leaving 0 free)</span>
-<span class="code-comment">// - Deduct 25 from permanent (leaving 75 permanent)</span>
-                            </div>
-                            
-                            <div class="code-example">
-<strong>// Set specific balance (for resets)</strong>
-<span class="code-comment">// Reset free balance only</span>
-slimwp()->set_balance($user_id, 100, 'Daily reset', 'daily_reset', 'free');
-
-<span class="code-comment">// Set permanent balance</span>
-slimwp()->set_balance($user_id, 500, 'VIP upgrade', 'admin_adjustment', 'permanent');
-                            </div>
-                            
-                            <div class="code-example">
-<strong>// Check total balance before action</strong>
-if (slimwp_get_user_points($user_id) >= 100) {
-    <span class="code-comment">// User has enough total points, proceed</span>
-    slimwp_subtract_user_points($user_id, 100, 'Unlocked premium content');
-    <span class="code-comment">// System will automatically deduct from free first, then permanent</span>
-}
-                            </div>
-                            
-                            <div class="code-example">
-<strong>// Helper functions (new SlimWP functions)</strong>
-slimwp_get_user_points($user_id);              <span class="code-comment">// Returns total (free + permanent)</span>
-slimwp_add_user_points($user_id, 50, 'Bonus'); <span class="code-comment">// Adds to free balance by default</span>
-slimwp_subtract_user_points($user_id, 20, 'Used feature'); <span class="code-comment">// Deducts from free first</span>
-                            </div>
-                            
-                            <div class="code-example">
-<strong>// Hook into balance updates</strong>
-add_action('slimwp_points_balance_updated', function($user_id, $amount, $new_total, $description) {
-    <span class="code-comment">// $new_total is the combined balance (free + permanent)</span>
-    $free = slimwp()->get_free_balance($user_id);
-    $permanent = slimwp()->get_permanent_balance($user_id);
-    
-    <span class="code-comment">// Log or notify based on balance changes</span>
-    error_log("User $user_id balance: Free=$free, Permanent=$permanent, Total=$new_total");
-}, 10, 4);
-                            </div>
-                        </div>
-                        
-                        <h3 style="margin: 24px 0 16px; font-size: 16px; font-weight: 600;">Balance-Specific Functions</h3>
-                        
-                        <div class="api-grid">
-                            <div class="api-card">
-                                <h4>slimwp_get_user_free_points($user_id)</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Get only the free balance (resettable)</p>
-                            </div>
-                            <div class="api-card">
-                                <h4>slimwp_get_user_permanent_points($user_id)</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Get only the permanent balance (never reset)</p>
-                            </div>
-                            <div class="api-card">
-                                <h4>slimwp()->add_points($user_id, $amount, $desc, $type, $balance_type)</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Add to specific balance. <code>$balance_type</code> can be 'free' or 'permanent'</p>
-                            </div>
-                            <div class="api-card">
-                                <h4>slimwp()->set_balance($user_id, $amount, $desc, $type, $balance_type)</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Set specific balance to exact amount</p>
-                            </div>
-                        </div>
-                        
-                        <h3 style="margin: 24px 0 16px; font-size: 16px; font-weight: 600;">Shortcodes</h3>
-                        
-                        <div class="api-grid">
-                            <div class="api-card">
-                                <h4>[slimwp_points]</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Display total points balance</p>
-                            </div>
-                            <div class="api-card">
-                                <h4>[slimwp_points_free]</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Display free balance only</p>
-                            </div>
-                            <div class="api-card">
-                                <h4>[slimwp_points_permanent]</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Display permanent balance only</p>
-                            </div>
-                            <div class="api-card">
-                                <h4>[slimwp_points type="free" user_id="123"]</h4>
-                                <p style="margin: 0; font-size: 13px; color: #50575e;">Display specific balance for specific user</p>
-                            </div>
-                        </div>
-                        
-                        <h3 style="margin: 24px 0 16px; font-size: 16px; font-weight: 600;">Usage Scenarios</h3>
-                        
-                        <div class="info-box">
-                            <strong>Free Balance:</strong> Use for daily rewards, login bonuses, temporary promotions<br>
-                            <strong>Permanent Balance:</strong> Use for purchases, achievements, referral rewards, one-time bonuses
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

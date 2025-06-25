@@ -226,19 +226,42 @@ class SlimWP_Stripe {
             
             \Stripe\Stripe::setApiKey($secret_key);
             
-            // Configure SSL for local development environments
-            $is_local = (
-                defined('WP_DEBUG') && WP_DEBUG ||
-                strpos(home_url(), 'localhost') !== false ||
-                strpos(home_url(), '127.0.0.1') !== false ||
-                strpos(home_url(), '.local') !== false ||
-                strpos(home_url(), '.test') !== false
-            );
-            
-            if ($is_local) {
-                // In local development, disable SSL verification
+            // Configure SSL certificate handling
+            try {
+                // Load SSL fix helper
+                require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe-ssl-fix.php';
+                
+                // Try to use system CA bundle first
+                $ca_bundle_set = false;
+                if (function_exists('curl_version')) {
+                    $curl_info = curl_version();
+                    if (!empty($curl_info['cainfo']) && file_exists($curl_info['cainfo'])) {
+                        \Stripe\Stripe::setCABundlePath($curl_info['cainfo']);
+                        error_log('SlimWP Stripe: Using system CA bundle: ' . $curl_info['cainfo']);
+                        $ca_bundle_set = true;
+                    }
+                }
+                
+                // If system CA bundle not available, create our own
+                if (!$ca_bundle_set) {
+                    $ca_bundle_path = SlimWP_Stripe_SSL_Fix::ensure_ca_bundle();
+                    if ($ca_bundle_path && file_exists($ca_bundle_path)) {
+                        \Stripe\Stripe::setCABundlePath($ca_bundle_path);
+                        error_log('SlimWP Stripe: Using custom CA bundle: ' . $ca_bundle_path);
+                        $ca_bundle_set = true;
+                    }
+                }
+                
+                // Final fallback: disable SSL verification
+                if (!$ca_bundle_set) {
+                    \Stripe\Stripe::setVerifySslCerts(false);
+                    error_log('SlimWP Stripe: SSL verification disabled - no CA bundle available');
+                }
+                
+            } catch (Exception $e) {
+                // Fallback: disable SSL verification
                 \Stripe\Stripe::setVerifySslCerts(false);
-                error_log('SlimWP Stripe: SSL verification disabled for local development');
+                error_log('SlimWP Stripe: SSL verification disabled due to error: ' . $e->getMessage());
             }
             
             error_log('SlimWP Stripe: API key set successfully');

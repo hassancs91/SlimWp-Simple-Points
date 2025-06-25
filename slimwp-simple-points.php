@@ -41,7 +41,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('SLIMWP_VERSION', '1.0.0');
+define('SLIMWP_VERSION', '1.0.5');
 define('SLIMWP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SLIMWP_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SLIMWP_PLUGIN_FILE', __FILE__);

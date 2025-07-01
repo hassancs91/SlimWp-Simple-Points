@@ -72,6 +72,11 @@ class SlimWP_Points {
     public function get_free_balance($user_id) {
         global $wpdb;
         
+        // Validate user ID
+        if (!$user_id || $user_id <= 0) {
+            return 0; // Return 0 for invalid users instead of error
+        }
+        
         // Get from user meta (cached value)
         $balance = get_user_meta($user_id, 'slimwp_points_balance', true);
         
@@ -95,6 +100,11 @@ class SlimWP_Points {
     public function get_permanent_balance($user_id) {
         global $wpdb;
         
+        // Validate user ID
+        if (!$user_id || $user_id <= 0) {
+            return 0; // Return 0 for invalid users instead of error
+        }
+        
         // Get from user meta (cached value)
         $balance = get_user_meta($user_id, 'slimwp_points_balance_permanent', true);
         
@@ -117,6 +127,16 @@ class SlimWP_Points {
     
     public function add_points($user_id, $amount, $description = '', $type = 'manual', $balance_type = 'free') {
        global $wpdb;
+        
+        // Validate user ID
+        if (!$user_id || $user_id <= 0 || !get_user_by('ID', $user_id)) {
+            return new WP_Error('invalid_user', 'Invalid user ID provided.');
+        }
+        
+        // Validate amount
+        if (!is_numeric($amount)) {
+            return new WP_Error('invalid_amount', 'Amount must be numeric.');
+        }
         
         // Start transaction for atomicity
         $wpdb->query('START TRANSACTION');
@@ -166,6 +186,9 @@ class SlimWP_Points {
             // Trigger action for other plugins
             do_action('slimwp_points_balance_updated', $user_id, abs($amount), $new_free + $new_permanent, $description);
             
+            // Trigger live update event
+            $this->trigger_live_update($user_id, $balance_type);
+            
             return $new_free + $new_permanent;
             
         } catch (Exception $e) {
@@ -176,6 +199,16 @@ class SlimWP_Points {
     
     public function subtract_points($user_id, $amount, $description = '', $type = 'manual') {
         global $wpdb;
+        
+        // Validate user ID
+        if (!$user_id || $user_id <= 0 || !get_user_by('ID', $user_id)) {
+            return new WP_Error('invalid_user', 'Invalid user ID provided.');
+        }
+        
+        // Validate amount
+        if (!is_numeric($amount)) {
+            return new WP_Error('invalid_amount', 'Amount must be numeric.');
+        }
         
         $amount = abs($amount);
         
@@ -240,6 +273,9 @@ class SlimWP_Points {
             // Trigger action for other plugins
             do_action('slimwp_points_balance_updated', $user_id, -$amount, $new_free + $new_permanent, $description);
             
+            // Trigger live update event
+            $this->trigger_live_update($user_id, $balance_type);
+            
             return $new_free + $new_permanent;
             
         } catch (Exception $e) {
@@ -250,6 +286,16 @@ class SlimWP_Points {
     
     public function set_balance($user_id, $new_balance, $description = '', $type = 'balance_reset', $balance_type = 'free') {
                 global $wpdb;
+        
+        // Validate user ID
+        if (!$user_id || $user_id <= 0 || !get_user_by('ID', $user_id)) {
+            return new WP_Error('invalid_user', 'Invalid user ID provided.');
+        }
+        
+        // Validate amount
+        if (!is_numeric($new_balance) || $new_balance < 0) {
+            return new WP_Error('invalid_amount', 'Balance must be a non-negative number.');
+        }
         
         // Start transaction for atomicity
         $wpdb->query('START TRANSACTION');
@@ -301,6 +347,9 @@ class SlimWP_Points {
             // Trigger action for other plugins
             do_action('slimwp_points_balance_updated', $user_id, $amount, $new_free + $new_permanent, $description);
             
+            // Trigger live update event
+            $this->trigger_live_update($user_id, $balance_type);
+            
             return $new_free + $new_permanent;
             
         } catch (Exception $e) {
@@ -316,5 +365,66 @@ class SlimWP_Points {
     
     public function get_hooks_option() {
         return $this->hooks_option;
+    }
+    
+    /**
+     * Trigger live update events for real-time shortcode updates
+     */
+    private function trigger_live_update($user_id, $balance_type = 'all') {
+        // Validate and sanitize inputs
+        $user_id = intval($user_id);
+        $balance_type = $this->sanitize_balance_type($balance_type);
+        
+        if ($user_id <= 0) {
+            error_log('SlimWP Security: Invalid user ID in trigger_live_update: ' . $user_id);
+            return;
+        }
+        
+        // Store the update information to be sent to frontend via admin-ajax
+        add_action('wp_footer', function() use ($user_id, $balance_type) {
+            if (!wp_script_is('slimwp-live-points', 'enqueued')) {
+                return;
+            }
+            
+            // Use wp_localize_script for safe data passing instead of inline script
+            wp_localize_script('slimwp-live-points', 'slimwp_live_update_data', array(
+                'userId' => $user_id,
+                'balanceType' => $balance_type,
+                'timestamp' => current_time('timestamp'),
+                'nonce' => wp_create_nonce('slimwp_live_update_' . $user_id)
+            ));
+            
+            // Trigger the update via a safe inline script with CSP nonce
+            $nonce = wp_create_nonce('slimwp_inline_script');
+            ?>
+            <script<?php echo ' nonce="' . esc_attr($nonce) . '"'; ?>>
+            jQuery(document).ready(function($) {
+                if (typeof slimwp_live_update_data !== 'undefined') {
+                    $(document).trigger('slimwp:balance:updated', slimwp_live_update_data);
+                }
+            });
+            </script>
+            <?php
+        });
+        
+        // Also trigger WordPress action for other plugins
+        do_action('slimwp_live_update_triggered', $user_id, $balance_type);
+    }
+    
+    /**
+     * Sanitize balance type to prevent XSS
+     */
+    private function sanitize_balance_type($balance_type) {
+        $allowed_types = array('all', 'free', 'permanent', 'mixed', 'total');
+        
+        // Sanitize and validate
+        $balance_type = sanitize_text_field($balance_type);
+        
+        if (!in_array($balance_type, $allowed_types)) {
+            error_log('SlimWP Security: Invalid balance type attempted: ' . $balance_type);
+            return 'all'; // Safe default
+        }
+        
+        return $balance_type;
     }
 }

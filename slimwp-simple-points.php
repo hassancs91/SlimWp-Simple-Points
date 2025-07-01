@@ -201,6 +201,7 @@ function slimwp_get_woocommerce_status_message() {
 }
 
 // Include required files
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-security-utils.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-database.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-hooks.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-shortcodes.php';

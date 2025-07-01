@@ -297,10 +297,10 @@ class SlimWP_Admin {
                         <form method="get">
                             <input type="hidden" name="page" value="slimwp-points">
                             <label style="margin: 0; font-weight: 500;">Filter by User:</label>
-                            <input type="number" name="user_id" value="<?php echo $user_id; ?>" placeholder="User ID" style="width: 120px; padding: 6px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
+                            <input type="number" name="user_id" value="<?php echo esc_attr($user_id); ?>" placeholder="User ID" style="width: 120px; padding: 6px 12px; border: 1px solid #dcdcde; border-radius: 4px;">
                             <button type="submit" class="button button-primary">Filter</button>
                             <?php if ($user_id): ?>
-                                <a href="<?php echo admin_url('admin.php?page=slimwp-points'); ?>" class="button">Clear Filter</a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=slimwp-points')); ?>" class="button">Clear Filter</a>
                             <?php endif; ?>
                         </form>
                     </div>
@@ -336,20 +336,20 @@ class SlimWP_Admin {
                                         $total_after = $free_after + $permanent_after;
                                         ?>
                                         <tr>
-                                            <td style="color: #8c8f94;">#<?php echo $transaction->id; ?></td>
+                                            <td style="color: #8c8f94;">#<?php echo esc_html($transaction->id); ?></td>
                                             <td>
                                                 <div class="user-info">
                                                     <div class="user-avatar">
-                                                        <?php echo $user ? strtoupper(substr($user->display_name, 0, 1)) : '?'; ?>
+                                                        <?php echo $user ? esc_html(strtoupper(substr($user->display_name, 0, 1))) : '?'; ?>
                                                     </div>
                                                     <div class="user-details">
                                                         <?php if ($user): ?>
-                                                            <a href="<?php echo get_edit_user_link($transaction->user_id); ?>">
+                                                            <a href="<?php echo esc_url(get_edit_user_link($transaction->user_id)); ?>">
                                                                 <?php echo esc_html($user->display_name); ?>
                                                             </a>
                                                             <small><?php echo esc_html($user->user_email); ?></small>
                                                         <?php else: ?>
-                                                            <span style="color: #8c8f94;">User #<?php echo $transaction->user_id; ?> (deleted)</span>
+                                                            <span style="color: #8c8f94;">User #<?php echo esc_html($transaction->user_id); ?> (deleted)</span>
                                                         <?php endif; ?>
                                                     </div>
                                                 </div>
@@ -371,12 +371,12 @@ class SlimWP_Admin {
                                             <td><?php echo esc_html($transaction->description); ?></td>
                                             <td>
                                                 <span class="badge badge-<?php echo esc_attr($transaction->transaction_type); ?>">
-                                                    <?php echo str_replace('_', ' ', esc_html($transaction->transaction_type)); ?>
+                                                    <?php echo esc_html(str_replace('_', ' ', $transaction->transaction_type)); ?>
                                                 </span>
                                             </td>
                                             <td style="color: #50575e;">
-                                                <?php echo date('M d, Y', strtotime($transaction->created_at)); ?><br>
-                                                <small style="color: #8c8f94;"><?php echo date('g:i A', strtotime($transaction->created_at)); ?></small>
+                                                <?php echo esc_html(date('M d, Y', strtotime($transaction->created_at))); ?><br>
+                                                <small style="color: #8c8f94;"><?php echo esc_html(date('g:i A', strtotime($transaction->created_at))); ?></small>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -399,7 +399,7 @@ class SlimWP_Admin {
                         );
                         ?>
                         <div class="pagination-wrap">
-                            <?php echo paginate_links($args); ?>
+                            <?php echo wp_kses_post(paginate_links($args)); ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -499,7 +499,7 @@ class SlimWP_Admin {
         if ($success > 0) {
             echo '<div class="notice notice-success is-dismissible" style="margin: 20px 20px 0; padding: 12px 20px; border-left: 4px solid #00a32a; background: #fff;">
                     <p style="margin: 0; font-size: 14px;">
-                        <strong>✅ Success!</strong> Updated ' . $balance_type . ' balance for ' . $success . ' user' . ($success !== 1 ? 's' : '') . '.
+                        <strong>✅ Success!</strong> Updated ' . esc_html($balance_type) . ' balance for ' . esc_html($success) . ' user' . ($success !== 1 ? 's' : '') . '.
                     </p>
                   </div>';
         }
@@ -742,10 +742,10 @@ class SlimWP_Admin {
                         <form method="get">
                             <input type="hidden" name="page" value="slimwp-user-consumption">
                             <input type="text" name="search" value="<?php echo esc_attr($search); ?>" placeholder="Search users..." style="width: 200px;">
-                            <input type="number" name="min_balance" value="<?php echo $min_balance; ?>" placeholder="Min balance" style="width: 120px;" step="0.01">
+                            <input type="number" name="min_balance" value="<?php echo esc_attr($min_balance); ?>" placeholder="Min balance" style="width: 120px;" step="0.01">
                             <button type="submit" class="button button-primary">Filter</button>
                             <?php if (!empty($search) || $min_balance > 0): ?>
-                                <a href="<?php echo admin_url('admin.php?page=slimwp-user-consumption'); ?>" class="button">Clear Filters</a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=slimwp-user-consumption')); ?>" class="button">Clear Filters</a>
                             <?php endif; ?>
                         </form>
                     </div>
@@ -806,10 +806,10 @@ class SlimWP_Admin {
                                             <td>
                                                 <div class="user-info">
                                                     <div class="user-avatar">
-                                                        <?php echo strtoupper(substr($user_data->display_name, 0, 1)); ?>
+                                                        <?php echo esc_html(strtoupper(substr($user_data->display_name, 0, 1))); ?>
                                                     </div>
                                                     <div class="user-details">
-                                                        <a href="<?php echo get_edit_user_link($user_data->ID); ?>">
+                                                        <a href="<?php echo esc_url(get_edit_user_link($user_data->ID)); ?>">
                                                             <?php echo esc_html($user_data->display_name); ?>
                                                         </a>
                                                         <small><?php echo esc_html($user_data->user_email); ?></small>
@@ -823,32 +823,32 @@ class SlimWP_Admin {
                                                     Perm: <?php echo number_format($user_data->permanent_balance, 0); ?>
                                                 </div>
                                             </td>
-                                            <td class="consumption-cell <?php echo $today_class; ?>">
+                                            <td class="consumption-cell <?php echo esc_attr($today_class); ?>">
                                                 <?php echo $today_consumed > 0 ? number_format($today_consumed, 0) : '-'; ?>
                                             </td>
-                                            <td class="consumption-cell <?php echo $yesterday_class; ?>">
+                                            <td class="consumption-cell <?php echo esc_attr($yesterday_class); ?>">
                                                 <?php echo $yesterday_consumed > 0 ? number_format($yesterday_consumed, 0) : '-'; ?>
                                             </td>
-                                            <td class="consumption-cell <?php echo $week_class; ?>">
+                                            <td class="consumption-cell <?php echo esc_attr($week_class); ?>">
                                                 <?php echo $week_consumed > 0 ? number_format($week_consumed, 0) : '-'; ?>
                                             </td>
-                                            <td class="consumption-cell <?php echo $month_class; ?>">
+                                            <td class="consumption-cell <?php echo esc_attr($month_class); ?>">
                                                 <?php echo $month_consumed > 0 ? number_format($month_consumed, 0) : '-'; ?>
                                             </td>
                                             <td style="text-align: center;">
-                                                <span class="activity-indicator <?php echo $activity_class; ?>">
-                                                    <?php echo $activity_text; ?>
+                                                <span class="activity-indicator <?php echo esc_attr($activity_class); ?>">
+                                                    <?php echo esc_html($activity_text); ?>
                                                 </span>
                                                 <?php if ($user_data->last_activity): ?>
                                                     <br><small style="color: #8c8f94; font-size: 10px;">
-                                                        <?php echo date('M d', strtotime($user_data->last_activity)); ?>
+                                                        <?php echo esc_html(date('M d', strtotime($user_data->last_activity))); ?>
                                                     </small>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
                                                 <div class="quick-actions">
-                                                    <a href="<?php echo admin_url('admin.php?page=slimwp-points&user_id=' . $user_data->ID); ?>" class="quick-btn">View</a>
-                                                    <a href="<?php echo get_edit_user_link($user_data->ID); ?>" class="quick-btn">Edit</a>
+                                                    <a href="<?php echo esc_url(admin_url('admin.php?page=slimwp-points&user_id=' . $user_data->ID)); ?>" class="quick-btn">View</a>
+                                                    <a href="<?php echo esc_url(get_edit_user_link($user_data->ID)); ?>" class="quick-btn">Edit</a>
                                                 </div>
                                             </td>
                                         </tr>
@@ -876,9 +876,9 @@ class SlimWP_Admin {
                         );
                         ?>
                         <div class="pagination-wrap">
-                            <?php echo paginate_links($args); ?>
+                            <?php echo wp_kses_post(paginate_links($args)); ?>
                             <p style="margin-top: 16px; color: #8c8f94; font-size: 13px;">
-                                Showing <?php echo (($page - 1) * $per_page) + 1; ?>-<?php echo min($page * $per_page, $total_users); ?> of <?php echo number_format($total_users); ?> users
+                                Showing <?php echo esc_html((($page - 1) * $per_page) + 1); ?>-<?php echo esc_html(min($page * $per_page, $total_users)); ?> of <?php echo esc_html(number_format($total_users)); ?> users
                             </p>
                         </div>
                     <?php endif; ?>

@@ -66,7 +66,8 @@ function slimwp_check_php_version() {
  */
 function slimwp_php_version_notice() {
     $message = sprintf(
-        __('SlimWP Simple Points requires PHP version %s or higher. You are running PHP %s. Please upgrade PHP to use this plugin.', 'SlimWp-Simple-Points'),
+        /* translators: %1$s: minimum required PHP version, %2$s: current PHP version */
+        __('SlimWP Simple Points requires PHP version %1$s or higher. You are running PHP %2$s. Please upgrade PHP to use this plugin.', 'SlimWp-Simple-Points'),
         SLIMWP_MIN_PHP_VERSION,
         PHP_VERSION
     );
@@ -91,7 +92,8 @@ function slimwp_check_wp_version() {
 function slimwp_wp_version_notice() {
     global $wp_version;
     $message = sprintf(
-        __('SlimWP Simple Points requires WordPress version %s or higher. You are running WordPress %s. Please upgrade WordPress to use this plugin.', 'SlimWp-Simple-Points'),
+        /* translators: %1$s: minimum required WordPress version, %2$s: current WordPress version */
+        __('SlimWP Simple Points requires WordPress version %1$s or higher. You are running WordPress %2$s. Please upgrade WordPress to use this plugin.', 'SlimWp-Simple-Points'),
         SLIMWP_MIN_WP_VERSION,
         $wp_version
     );
@@ -145,12 +147,14 @@ function slimwp_woocommerce_dependency_notice() {
     
     if (!class_exists('WooCommerce')) {
         $message = sprintf(
-            __('SlimWP Simple Points: WooCommerce integration is enabled but WooCommerce plugin is not installed or activated. %sInstall WooCommerce%s to use this feature.', 'SlimWp-Simple-Points'),
+            /* translators: %1$s: opening link tag, %2$s: closing link tag */
+            __('SlimWP Simple Points: WooCommerce integration is enabled but WooCommerce plugin is not installed or activated. %1$sInstall WooCommerce%2$s to use this feature.', 'SlimWp-Simple-Points'),
             '<a href="' . admin_url('plugin-install.php?tab=plugin-information&plugin=woocommerce') . '" target="_blank">',
             '</a>'
         );
     } elseif (defined('WC_VERSION') && version_compare(WC_VERSION, '3.0', '<')) {
         $message = sprintf(
+            /* translators: %s: current WooCommerce version */
             __('SlimWP Simple Points: WooCommerce integration requires WooCommerce version 3.0 or higher. You are running version %s. Please update WooCommerce.', 'SlimWp-Simple-Points'),
             WC_VERSION
         );
@@ -188,6 +192,7 @@ function slimwp_get_woocommerce_status_message() {
     if (defined('WC_VERSION') && version_compare(WC_VERSION, '3.0', '<')) {
         return array(
             'status' => 'outdated',
+            /* translators: %s: current WooCommerce version */
             'message' => sprintf(__('WooCommerce version %s is installed.', 'SlimWp-Simple-Points'), WC_VERSION),
             'action' => __('WooCommerce 3.0+ is required. Please update WooCommerce.', 'SlimWp-Simple-Points')
         );
@@ -195,6 +200,7 @@ function slimwp_get_woocommerce_status_message() {
     
     return array(
         'status' => 'active',
+        /* translators: %s: current WooCommerce version */
         'message' => sprintf(__('WooCommerce version %s is active and compatible.', 'SlimWp-Simple-Points'), defined('WC_VERSION') ? WC_VERSION : __('Unknown', 'SlimWp-Simple-Points')),
         'action' => __('WooCommerce integration is ready to use.', 'SlimWp-Simple-Points')
     );
@@ -237,7 +243,8 @@ register_activation_hook(__FILE__, function() {
     if (!slimwp_check_requirements()) {
         wp_die(
             sprintf(
-                __('SlimWP Simple Points cannot be activated. Please ensure you have PHP %s+ and WordPress %s+.', 'SlimWp-Simple-Points'),
+                /* translators: %1$s: minimum required PHP version, %2$s: minimum required WordPress version */
+                __('SlimWP Simple Points cannot be activated. Please ensure you have PHP %1$s+ and WordPress %2$s+.', 'SlimWp-Simple-Points'),
                 SLIMWP_MIN_PHP_VERSION,
                 SLIMWP_MIN_WP_VERSION
             ),

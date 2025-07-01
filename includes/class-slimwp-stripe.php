@@ -42,12 +42,12 @@ class SlimWP_Stripe {
             return;
         }
         
-        // Enqueue Stripe.js
+        // Enqueue Stripe.js (external CDN, version managed by Stripe)
         wp_enqueue_script(
             'stripe-js',
             'https://js.stripe.com/v3/',
             array(),
-            null,
+            '3.0', // Stripe API version
             true
         );
         

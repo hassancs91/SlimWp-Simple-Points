@@ -11,7 +11,6 @@ class SlimWP_Points {
     private $hooks_option = 'slimwp_points_hooks';
     
     // Component instances
-    private $database;
     private $hooks;
     private $shortcodes;
     private $ajax;
@@ -34,7 +33,7 @@ class SlimWP_Points {
         $this->table_name = $wpdb->prefix . 'slimwp_user_points_transactions';
         
         // Initialize components
-        $this->database = new SlimWP_Database();
+        // Note: SlimWP_Database uses static methods, no instantiation needed
         $this->hooks = new SlimWP_Hooks($this);
         $this->shortcodes = new SlimWP_Shortcodes($this);
         $this->ajax = new SlimWP_Ajax($this);
@@ -59,7 +58,7 @@ class SlimWP_Points {
     
     public function init() {
         // Ensure tables exist
-        $this->database->create_tables();
+        SlimWP_Database::create_tables();
     }
     
     // Keep all the core balance methods here

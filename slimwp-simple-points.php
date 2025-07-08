@@ -19,18 +19,22 @@ require_once 'plugin-update-checker-master/plugin-update-checker.php';
 
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
-// Setup the update checker
+// Setup the update checker - temporarily disabled until properly configured
+// TODO: Configure update checker properly for your deployment method
+/*
 $myUpdateChecker = PucFactory::buildUpdateChecker(
-    'https://github.com/hassancs91/SlimWp-Simple-Points/',
+    'https://slimwp.com/wp-content/uploads/plugins/slimwp-simple-points/', // Your server path
     __FILE__,
     'slimwp-simple-points'
 );
 
 // Set authentication token for private repo
-$myUpdateChecker->setAuthentication('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');
+// TODO: Fix setAuthentication method - not available in this version
+// $myUpdateChecker->setAuthentication('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');
 
 // Set the branch to main (or master, depending on your repository)
 $myUpdateChecker->setBranch('main');
+*/
 
 
 
@@ -219,6 +223,7 @@ require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-documentation.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-points.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-woocommerce.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe-database.php';
+require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe-ssl-fix.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/class-slimwp-stripe-packages.php';
 require_once SLIMWP_PLUGIN_DIR . 'includes/functions.php';

@@ -60,13 +60,13 @@ class SlimWP_Database {
             return false;
         }
         
-        // Use prepared statement to check if column exists
-        $columns = $wpdb->get_col($wpdb->prepare("SHOW COLUMNS FROM `%s`", $table_name));
+        // Check if column exists (table name already validated above)
+        $columns = $wpdb->get_col("SHOW COLUMNS FROM `{$table_name}`");
         
         if (!in_array($column_name, $columns)) {
             // Use the whitelisted definition
             $safe_definition = $allowed_definitions[$column_name];
-            $result = $wpdb->query($wpdb->prepare("ALTER TABLE `%s` %s", $table_name, $safe_definition));
+            $result = $wpdb->query("ALTER TABLE `{$table_name}` {$safe_definition}");
             
             if ($result === false) {
                 error_log('SlimWP Database Error: Failed to add column ' . $column_name . ' - ' . $wpdb->last_error);

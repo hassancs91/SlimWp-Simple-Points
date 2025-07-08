@@ -27,7 +27,13 @@ class SlimWP_Settings {
     }
     
     public function settings_page() {
-        if (isset($_POST['submit']) && check_admin_referer('slimwp_settings')) {
+        if (isset($_POST['submit'])) {
+            // Verify nonce only when form is submitted
+            check_admin_referer('slimwp_settings');
+            
+            // Debug: Log what we're receiving
+            error_log('SlimWP Settings: Form submitted. POST data: ' . print_r($_POST, true));
+            
             $hooks = array(
                 'register' => isset($_POST['hooks']['register']),
                 'register_points' => intval($_POST['register_points']),
@@ -40,7 +46,14 @@ class SlimWP_Settings {
                 'monthly_reset' => isset($_POST['hooks']['monthly_reset']),
                 'monthly_reset_points' => intval($_POST['monthly_reset_points'])
             );
-            update_option($this->hooks_option, $hooks);
+            
+            // Debug: Log what we're saving
+            error_log('SlimWP Settings: Saving hooks data: ' . print_r($hooks, true));
+            
+            $result = update_option($this->hooks_option, $hooks);
+            
+            // Debug: Log result
+            error_log('SlimWP Settings: Update result: ' . ($result ? 'SUCCESS' : 'FAILED'));
             
             // Save WooCommerce settings with dependency validation
             $woocommerce_enabled = isset($_POST['woocommerce']['enabled']);
@@ -85,10 +98,10 @@ class SlimWP_Settings {
         }
         
         $hooks = get_option($this->hooks_option, array(
-            'register' => true,
+            'register' => false,
             'register_points' => 100,
             'register_balance_type' => 'permanent',
-            'daily_login' => true,
+            'daily_login' => false,
             'daily_login_points' => 10,
             'daily_login_balance_type' => 'free',
             'daily_reset' => false,

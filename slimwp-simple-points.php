@@ -1,15 +1,16 @@
 <?php
 /**
  * Plugin Name: SlimWP Simple Points
- * Plugin URI: https://yourwebsite.com/slimwp-simple-points
+ * Plugin URI: https://github.com/hassancs91/SlimWP-Simple-Points
  * Description: A lightweight dual-balance points system for WordPress with free and permanent points tracking.
- * Version: 1.0.6
+ * Version: 1.0.7
  * Author: Hasan Aboul Hasan
  * Author URI: https://learnwithhasan.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: SlimWp-Simple-Points
  * Domain Path: /languages
+ * GitHub URI: hassancs91/SlimWP-Simple-Points
  */
 
 
@@ -17,24 +18,17 @@
 // Include the update checker
 require_once 'plugin-update-checker-master/plugin-update-checker.php';
 
-use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+use YahnisElsts\PluginUpdateChecker\v5p5\PucFactory;
 
-// Setup the update checker - temporarily disabled until properly configured
-// TODO: Configure update checker properly for your deployment method
-/*
+// Setup the update checker for GitHub public repository
 $myUpdateChecker = PucFactory::buildUpdateChecker(
-    'https://slimwp.com/wp-content/uploads/plugins/slimwp-simple-points/', // Your server path
+    'https://github.com/hassancs91/SlimWP-Simple-Points',
     __FILE__,
     'slimwp-simple-points'
 );
 
-// Set authentication token for private repo
-// TODO: Fix setAuthentication method - not available in this version
-// $myUpdateChecker->setAuthentication('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');
-
-// Set the branch to main (or master, depending on your repository)
+// Set the branch to main
 $myUpdateChecker->setBranch('main');
-*/
 
 
 
@@ -45,7 +39,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('SLIMWP_VERSION', '1.0.6');
+define('SLIMWP_VERSION', '1.0.7');
 define('SLIMWP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SLIMWP_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SLIMWP_PLUGIN_FILE', __FILE__);
